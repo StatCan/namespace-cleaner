@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
             - name: namespace-cleaner-container
-              image: k8scc01covidacr/bryan-azure-cli:latest
+              image: k8scc01covidacr/namespace-cleaner:latest
               envFrom:
                 - secretRef:
                     name: azure-creds
