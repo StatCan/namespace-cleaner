@@ -3,27 +3,23 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: namespace-cleaner
+  namespace: bryan-paget
 spec:
-  schedule: "0 0 * * *"
+  schedule: "*/5 * * * *"
   jobTemplate:
     spec:
       template:
         spec:
           containers:
             - name: namespace-cleaner-container
-              image: k8scc01covidacr/namespace-cleaner:latest
+              image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:8a15ac897db4b50a795285dd67d29bd310845bf7
               envFrom:
                 - secretRef:
                     name: azure-creds
-              volumeMounts:
-                - name: config
-                  mountPath: /etc/cleaner-config
+                - configMapRef:
+                    name: namespace-cleaner-config
               resources:
                 limits:
                   memory: "256Mi"
                   cpu: "500m"
-          volumes:
-            - name: config
-              configMap:
-                name: namespace-cleaner-config
           restartPolicy: Never

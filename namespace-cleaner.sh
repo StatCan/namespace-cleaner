@@ -41,17 +41,6 @@ load_config() {
     if [ "$TEST_MODE" = "true" ]; then
         echo "TEST MODE: Initializing from Kubernetes ConfigMaps"
 
-        # Validate test configuration resources
-        for cm in namespace-cleaner-config namespace-cleaner-test-users; do
-            if ! kubectl get configmap "$cm" >/dev/null; then
-                echo "Error: Missing required test ConfigMap '$cm'"
-                exit 1
-            fi
-        done
-
-        # Load configuration directly into environment
-        eval "$(kubectl get configmap namespace-cleaner-config -o jsonpath='{.data.config\.env}')"
-
         # Validate essential configuration parameters
         if [ -z "${ALLOWED_DOMAINS:-}" ] || [ -z "${GRACE_PERIOD:-}" ]; then
             echo "Error: Invalid test configuration - verify ConfigMap contents"
@@ -62,9 +51,6 @@ load_config() {
         TEST_USERS=$(kubectl get configmap namespace-cleaner-test-users -o jsonpath='{.data.users}' | tr ',' '\n')
     else
         echo "PRODUCTION MODE: Loading cluster configuration"
-
-        # Load configuration directly into environment
-        eval "$(kubectl get configmap namespace-cleaner-config -o jsonpath='{.data.config\.env}')"
 
         # Validate essential configuration parameters
         if [ -z "${ALLOWED_DOMAINS:-}" ] || [ -z "${GRACE_PERIOD:-}" ]; then

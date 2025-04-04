@@ -12,6 +12,5 @@ kind: ConfigMap
 metadata:
   name: namespace-cleaner-config
 data:
-  config.env: |
-    ALLOWED_DOMAINS="company.com,example.org"
-    GRACE_PERIOD="0d"
+  ALLOWED_DOMAINS: "company.com,example.org"
+  GRACE_PERIOD: "0d"
