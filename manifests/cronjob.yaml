@@ -1,0 +1,29 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: namespace-cleaner
+spec:
+  schedule: "0 0 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: namespace-cleaner-container
+              image: k8scc01covidacr/bryan-azure-cli:latest
+              envFrom:
+                - secretRef:
+                    name: azure-creds
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/cleaner-config
+              resources:
+                limits:
+                  memory: "256Mi"
+                  cpu: "500m"
+          volumes:
+            - name: config
+              configMap:
+                name: namespace-cleaner-config
+          restartPolicy: Never

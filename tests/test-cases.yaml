@@ -1,0 +1,32 @@
+---
+# Positive test cases (should NOT be deleted)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-valid-user
+  labels:
+    app.kubernetes.io/part-of: kubeflow-profile
+  annotations:
+    owner: test-user@company.com
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-expired-ns
+  labels:
+    app.kubernetes.io/part-of: kubeflow-profile
+    namespace-cleaner/delete-at: "2000-01-01"  # Expired date
+  annotations:
+    owner: "invalid-user@example.org"  # Not in TEST_USERS
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-invalid-user
+  labels:
+    app.kubernetes.io/part-of: kubeflow-profile
+    namespace-cleaner/delete-at: "2000-01-01"  # Expired date
+  annotations:
+    owner: "missing-user@company.com"  # Not in TEST_USERS

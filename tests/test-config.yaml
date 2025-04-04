@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespace-cleaner-test-users
+data:
+  users: "test-user@company.com,restored-user@example.org"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespace-cleaner-config
+data:
+  config.env: |
+    ALLOWED_DOMAINS="company.com,example.org"
+    GRACE_PERIOD="0d"
