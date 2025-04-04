@@ -14,7 +14,7 @@ run:
 	@echo "Deploying namespace cleaner..."
 	kubectl apply -f manifests/configmap.yaml -f manifests/azure-creds.yaml -f manifests/cronjob.yaml
 	@echo "\nCronJob scheduled. Next run:"
-	kubectl get cronjob namespace-cleaner -o jsonpath='{.status.nextScheduleTime}'
+	kubectl -n bryan-paget get cronjob namespace-cleaner -o jsonpath='{.status.nextScheduleTime}'
 
 # Dry-run mode (no changes)
 dry-run:

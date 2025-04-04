@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: namespace-cleaner
-  namespace: argocd
+  namespace: bryan-paget
 spec:
   project: default
   source:
