@@ -3,8 +3,15 @@
 # Local testing (no Azure, real execution)
 test:
 	@echo "Running local test suite..."
-	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
-	kubectl run testpod --image bitnami/kubectl:latest --restart=Never -- DRY_RUN=false TEST_MODE=true ./namespace-cleaner.sh
+	kubectl apply \
+		-f tests/test-config.yaml \
+		-f tests/test-cases.yaml
+	kubectl run testpod \
+		--image bitnami/kubectl:latest \
+		--restart=Never \
+		--env DRY_RUN=false \
+		--env TEST_MODE=true \
+		-- ./namespace-cleaner.sh
 	@echo "\nVerification:"
 	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
 	@make clean-test
@@ -16,16 +23,15 @@ run:
 				  -f manifests/cronjob.yaml \
 				  -f manifests/serviceaccount.yaml \
 				  -f manifests/rbac.yaml
-	@echo "\nCronJob scheduled. Next run:"
-	kubectl -n das get cronjob namespace-cleaner -o jsonpath='{.status.nextScheduleTime}'
+	@echo "\nCronJob scheduled."
 
 # Dry-run mode
 dry-run:
 	@echo "Executing production dry-run (real Azure checks)"
-	kubectl apply -f manifests/configmap.yaml \
+	kubectl apply -f tests/dry-run-config.yaml \
 				  -f manifests/serviceaccount.yaml \
-				  -f manifests/rbac.yaml
-	kubectl -n das run dryrunpod --restart=Never --image artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:aa1a97bef1368b348a21fbf21a844ae671fb21be -- DRY_RUN=true TEST_MODE=false ./namespace-cleaner.sh
+				  -f manifests/rbac.yaml \
+				  -f tests/job.yaml
 
 # Stop production deployment
 stop:

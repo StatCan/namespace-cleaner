@@ -5,7 +5,7 @@ metadata:
   name: namespace-cleaner
   namespace: das
 spec:
-  schedule: "*/5 * * * *"
+  schedule: "0 0 * * *"
   jobTemplate:
     spec:
       template:
