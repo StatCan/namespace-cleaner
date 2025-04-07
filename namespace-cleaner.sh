@@ -58,12 +58,12 @@ kubectl_dryrun() {
 # Calculate deletion date based on grace period
 # @return: Date in YYYY-MM-DD format
 get_grace_date() {
-    # Extract numeric days from GRACE_PERIOD (e.g., "7d" -> 7)
     grace_days=$(echo "$GRACE_PERIOD" | grep -oE '^[0-9]+')
     [ -n "$grace_days" ] || { echo "Invalid GRACE_PERIOD: $GRACE_PERIOD"; exit 1; }
 
-    # Calculate future date using native date utility
-    date -u -d "now + $grace_days days" "+%Y-%m-%d"
+    # Add days as seconds: days * 86400
+    future_ts=$(( $(date +%s) + grace_days * 86400 ))
+    date -u -d "@$future_ts" "+%Y-%m-%d"
 }
 
 # ---------------------------

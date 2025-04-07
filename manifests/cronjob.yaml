@@ -16,7 +16,7 @@ spec:
               image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:085ae39e9677bc106fbdf67322565027ebce096d
               envFrom:
                 - secretRef:
-                    name: azure-creds
+                    name: microsoft-graph-api-secret
                 - configMapRef:
                     name: namespace-cleaner-config
               resources:
