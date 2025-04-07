@@ -3,11 +3,11 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: namespace-cleaner
-  namespace: bryan-paget
+  namespace: das
 spec:
   project: default
   source:
-    repoURL: https://github.com/bryanpaget/namespace-cleaner.git
+    repoURL: https://github.com/StatCan/namespace-cleaner.git
     path: manifests
     targetRevision: main
   destination:

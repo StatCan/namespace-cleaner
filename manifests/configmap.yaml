@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: namespace-cleaner-config
-  namespace: bryan-paget
+  namespace: das
 data:
   ALLOWED_DOMAINS: "statcan.gc.ca,cloud.statcan.ca"
   GRACE_PERIOD: "30d"
