@@ -13,7 +13,6 @@ test:
 run:
 	@echo "Deploying namespace cleaner..."
 	kubectl apply -f manifests/configmap.yaml \
-	              -f manifests/azure-creds.yaml \
 				  -f manifests/cronjob.yaml \
 				  -f manifests/serviceaccount.yaml \
 				  -f manifests/rbac.yaml
@@ -24,7 +23,6 @@ run:
 dry-run:
 	@echo "Executing production dry-run (real Azure checks)"
 	kubectl apply -f manifests/configmap.yaml \
-	              -f manifests/azure-creds.yaml \
 				  -f manifests/serviceaccount.yaml \
 				  -f manifests/rbac.yaml
 	kubectl run dryrunpod --restart=Never --image artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:085ae39e9677bc106fbdf67322565027ebce096d -- DRY_RUN=true TEST_MODE=false ./namespace-cleaner.sh
@@ -33,7 +31,7 @@ dry-run:
 stop:
 	@echo "Stopping namespace cleaner..."
 	kubectl delete -f manifests/cronjob.yaml --ignore-not-found
-	@echo "Retaining configmap/azure-creds/serviceaccount/rbac for audit purposes."
+	@echo "Retaining configmap/serviceaccount/rbac for audit purposes."
 
 # Clean test artifacts
 clean-test:
@@ -47,7 +45,6 @@ clean-test:
 clean: clean-test
 	@echo "Cleaning production resources..."
 	kubectl delete -f manifests/configmap.yaml \
-				   -f manifests/azure-creds.yaml \
 				   -f manifests/cronjob.yaml \
 				   -f manifests/rbac.yaml \
 				   -f manifests/serviceaccount.yaml --ignore-not-found
