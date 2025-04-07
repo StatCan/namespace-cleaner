@@ -44,7 +44,7 @@ clean-test:
 	@echo "Cleaning test resources..."
 	kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
 	kubectl delete pod testpod --ignore-not-found
-	kubectl delete pod dryrunpod --ignore-not-found
+	kubectl delete job namespace-cleaner-container-job --ignore-not-found
 
 
 # Full cleanup (including production)

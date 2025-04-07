@@ -11,4 +11,4 @@ COPY namespace-cleaner.sh /namespace-cleaner.sh
 RUN chmod +x /namespace-cleaner.sh
 
 # Entry point to run the script
-ENTRYPOINT ["/bin/bash", "-c", "/namespace-cleaner.sh"]
+ENTRYPOINT ["/bin/bash", "-c", "az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID && /namespace-cleaner.sh"]
