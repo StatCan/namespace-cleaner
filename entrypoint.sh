@@ -2,7 +2,8 @@
 set -e
 
 echo Logging in to Azure...
-az login --service-principle \
+
+az login --service-principal \
          --username "$CLIENT_ID" \
          --password "$CLIENT_SECRET" \
          --tenant "$TENANT_ID"
