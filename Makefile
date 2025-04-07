@@ -25,7 +25,7 @@ dry-run:
 	kubectl apply -f manifests/configmap.yaml \
 				  -f manifests/serviceaccount.yaml \
 				  -f manifests/rbac.yaml
-	kubectl run dryrunpod --restart=Never --image artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:085ae39e9677bc106fbdf67322565027ebce096d -- DRY_RUN=true TEST_MODE=false ./namespace-cleaner.sh
+	kubectl run dryrunpod --restart=Never --image artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:aa1a97bef1368b348a21fbf21a844ae671fb21be -- DRY_RUN=true TEST_MODE=false ./namespace-cleaner.sh
 
 # Stop production deployment
 stop:
