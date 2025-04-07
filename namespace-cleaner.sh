@@ -27,7 +27,8 @@ user_exists() {
         echo "$TEST_USERS" | grep -qFx "$user"
     else
         echo Checking "$user" ...
-        az ad user show --id "$user" >/dev/null 2>&1
+        az ad user show --id "$user"
+        # >/dev/null 2>&1
     fi
 }
 

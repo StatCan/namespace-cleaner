@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespace-cleaner-dry-run-config
+  namespace: das
+data:
+  ALLOWED_DOMAINS: "statcan.gc.ca,cloud.statcan.ca"
+  GRACE_PERIOD: "0d"
+  DRY_RUN: "true"
+  TEST_MODE: "false"
