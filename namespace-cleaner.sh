@@ -13,77 +13,6 @@ TEST_MODE=${TEST_MODE:-false}
 DRY_RUN=${DRY_RUN:-false}
 
 # ---------------------------
-# Dependency Verification
-# ---------------------------
-check_dependencies() {
-    # Verify availability of required system commands
-    # Critical dependencies for basic functionality
-    required_cmds="kubectl date cut tr grep"
-
-    # Azure CLI is only required in production mode
-    if [ "$TEST_MODE" = "false" ]; then
-        required_cmds="$required_cmds az"
-    fi
-
-    for cmd in $required_cmds; do
-        if ! command -v "$cmd" >/dev/null; then
-            echo "Error: Missing required command '$cmd'"
-            exit 1
-        fi
-    done
-}
-
-# ---------------------------
-# Configuration Management
-# ---------------------------
-load_config() {
-    # Load configuration from appropriate source based on mode
-    if [ "$TEST_MODE" = "true" ]; then
-        echo "TEST MODE: Initializing from Kubernetes ConfigMaps"
-
-        # Validate test configuration resources
-        for cm in namespace-cleaner-config namespace-cleaner-test-users; do
-            if ! kubectl get configmap "$cm" >/dev/null; then
-                echo "Error: Missing required test ConfigMap '$cm'"
-                exit 1
-            fi
-        done
-
-        # Load configuration directly into environment
-        eval "$(kubectl get configmap namespace-cleaner-config -o jsonpath='{.data.config\.env}')"
-
-        # Validate essential configuration parameters
-        if [ -z "${ALLOWED_DOMAINS:-}" ] || [ -z "${GRACE_PERIOD:-}" ]; then
-            echo "Error: Invalid test configuration - verify ConfigMap contents"
-            exit 1
-        fi
-
-        # Load mock user data for testing
-        TEST_USERS=$(kubectl get configmap namespace-cleaner-test-users -o jsonpath='{.data.users}' | tr ',' '\n')
-    else
-        echo "PRODUCTION MODE: Loading cluster configuration"
-
-        # Load configuration directly into environment
-        eval "$(kubectl get configmap namespace-cleaner-config -o jsonpath='{.data.config\.env}')"
-
-        # Validate essential configuration parameters
-        if [ -z "${ALLOWED_DOMAINS:-}" ] || [ -z "${GRACE_PERIOD:-}" ]; then
-            echo "Error: Invalid test configuration - verify ConfigMap contents"
-            exit 1
-        fi
-
-        # Azure authentication
-        if ! az login --service-principal \
-            -u "$AZURE_CLIENT_ID" \
-            -p "$AZURE_CLIENT_SECRET" \
-            --tenant "$AZURE_TENANT_ID" >/dev/null; then
-            echo "Error: Azure authentication failed - verify credentials in secret.yaml"
-            exit 1
-        fi
-    fi
-}
-
-# ---------------------------
 # Core Functions
 # ---------------------------
 
@@ -97,6 +26,7 @@ user_exists() {
         # Check against mock user list from ConfigMap
         echo "$TEST_USERS" | grep -qFx "$user"
     else
+        echo Checking "$user" ...
         az ad user show --id "$user" >/dev/null 2>&1
     fi
 }
@@ -187,6 +117,4 @@ process_namespaces() {
 # ---------------------------
 # Main Execution Flow
 # ---------------------------
-check_dependencies
-load_config
 process_namespaces

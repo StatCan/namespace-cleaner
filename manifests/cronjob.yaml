@@ -3,27 +3,24 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: namespace-cleaner
+  namespace: das
 spec:
-  schedule: "0 0 * * *"
+  schedule: "*/5 * * * *"
   jobTemplate:
     spec:
       template:
         spec:
+          serviceAccountName: namespace-cleaner
           containers:
             - name: namespace-cleaner-container
-              image: k8scc01covidacr/namespace-cleaner:latest
+              image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:085ae39e9677bc106fbdf67322565027ebce096d
               envFrom:
                 - secretRef:
                     name: azure-creds
-              volumeMounts:
-                - name: config
-                  mountPath: /etc/cleaner-config
+                - configMapRef:
+                    name: namespace-cleaner-config
               resources:
                 limits:
                   memory: "256Mi"
                   cpu: "500m"
-          volumes:
-            - name: config
-              configMap:
-                name: namespace-cleaner-config
           restartPolicy: Never

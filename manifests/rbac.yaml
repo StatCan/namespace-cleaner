@@ -1,0 +1,24 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: namespace-cleaner-reader
+  namespace: das
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: namespace-cleaner-bind
+  namespace: das
+subjects:
+  - kind: ServiceAccount
+    name: namespace-cleaner
+    namespace: das
+roleRef:
+  kind: Role
+  name: namespace-cleaner-reader
+  apiGroup: rbac.authorization.k8s.io

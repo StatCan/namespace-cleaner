@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/azure-cli:2.9.1
 
 # Install kubectl using Azure CLI
-RUN az aks install-cli && kubectl version --client
+RUN az aks install-cli
 
 # Set working directory
 WORKDIR /
