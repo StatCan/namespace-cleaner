@@ -6,9 +6,12 @@ RUN az aks install-cli
 # Set working directory
 WORKDIR /
 
-# Copy the script into the image
+# Copy scripts into image
 COPY namespace-cleaner.sh /namespace-cleaner.sh
-RUN chmod +x /namespace-cleaner.sh
+COPY entrypoint.sh /entrypoint.sh
 
-# Entry point to run the script
-ENTRYPOINT ["/bin/bash", "-c", "az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID && /namespace-cleaner.sh"]
+# Make scripts executable
+RUN chmod +x /namespace-cleaner.sh /entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
