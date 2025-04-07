@@ -13,7 +13,7 @@ spec:
           serviceAccountName: namespace-cleaner
           containers:
             - name: namespace-cleaner-container
-              image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:fa0f92224f2f233193745d4bbc9ca553f9fa4554
+              image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:384a9fb39c94ccf8959f8a037eac59dd7fae90e9
               envFrom:
                 - secretRef:
                     name: microsoft-graph-api-secret
