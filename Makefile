@@ -27,7 +27,7 @@ dry-run:
 	              -f manifests/azure-creds.yaml \
 				  -f manifests/serviceaccount.yaml \
 				  -f manifests/rbac.yaml
-	kubectl run dryrunpod --restart=Never --image artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:8a15ac897db4b50a795285dd67d29bd310845bf7 -- DRY_RUN=true TEST_MODE=false ./namespace-cleaner.sh
+	kubectl run dryrunpod --restart=Never --image artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:085ae39e9677bc106fbdf67322565027ebce096d -- DRY_RUN=true TEST_MODE=false ./namespace-cleaner.sh
 
 # Stop production deployment
 stop:

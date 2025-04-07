@@ -13,7 +13,7 @@ spec:
           serviceAccountName: namespace-cleaner
           containers:
             - name: namespace-cleaner-container
-              image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:8a15ac897db4b50a795285dd67d29bd310845bf7
+              image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:085ae39e9677bc106fbdf67322565027ebce096d
               envFrom:
                 - secretRef:
                     name: azure-creds
