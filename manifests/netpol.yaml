@@ -9,6 +9,6 @@ spec:
     matchLabels:
       app: namespace-cleaner
   egress:
-  - {}
+    - {}
   policyTypes:
-  - Egress
+    - Egress

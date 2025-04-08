@@ -5,7 +5,7 @@ metadata:
   name: namespace-cleaner
   namespace: das
   labels:
-    app: namespace-cleaner 
+    app: namespace-cleaner
 spec:
   schedule: "0 0 * * *"
   jobTemplate:
@@ -13,7 +13,7 @@ spec:
       template:
         metadata:
           labels:
-            app: namespace-cleaner 
+            app: namespace-cleaner
         spec:
           serviceAccountName: namespace-cleaner
           containers:
