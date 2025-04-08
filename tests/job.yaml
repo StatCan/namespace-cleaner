@@ -4,8 +4,13 @@ kind: Job
 metadata:
   name: namespace-cleaner-container-job
   namespace: das
+  labels:
+    app: namespace-cleaner
 spec:
   template:
+    metadata:
+      labels:
+        app: namespace-cleaner
     spec:
       serviceAccountName: namespace-cleaner
       containers:

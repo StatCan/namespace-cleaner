@@ -31,13 +31,14 @@ dry-run:
 	kubectl apply -f tests/dry-run-config.yaml \
 				  -f manifests/serviceaccount.yaml \
 				  -f manifests/rbac.yaml \
+				  -f manifests/netpol.yaml \
 				  -f tests/job.yaml
 
 # Stop production deployment
 stop:
 	@echo "Stopping namespace cleaner..."
 	kubectl delete -f manifests/cronjob.yaml --ignore-not-found
-	@echo "Retaining configmap/serviceaccount/rbac for audit purposes."
+	@echo "Retaining netpol/configmap/serviceaccount/rbac for audit purposes."
 
 # Clean test artifacts
 clean-test:
@@ -53,4 +54,6 @@ clean: clean-test
 	kubectl delete -f manifests/configmap.yaml \
 				   -f manifests/cronjob.yaml \
 				   -f manifests/rbac.yaml \
+				   -f manifests/netpol.yaml \
+				   -f tests/job.yaml \
 				   -f manifests/serviceaccount.yaml --ignore-not-found
