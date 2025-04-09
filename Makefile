@@ -1,7 +1,7 @@
-.PHONY: test dry-run run stop clean clean-test
+.PHONY: test dry-run run stop clean clean-test build
 
 # Local testing (no Azure, real execution)
-test:
+test: build
 	@echo "Running local test suite..."
 	kubectl apply \
 		-f tests/test-config.yaml \
@@ -11,13 +11,18 @@ test:
 		--restart=Never \
 		--env DRY_RUN=false \
 		--env TEST_MODE=true \
-		-- ./namespace-cleaner  # Use the Go binary here
+		-- ./namespace-cleaner
 	@echo "\nVerification:"
 	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
 	@make clean-test
 
+# Build Go binary
+build:
+	@echo "Building namespace-cleaner binary..."
+	go build -o namespace-cleaner ./cmd/namespace-cleaner
+
 # Deploy to production (with the Go binary)
-run:
+run: build
 	@echo "Deploying namespace cleaner..."
 	kubectl apply -f manifests/configmap.yaml \
 				  -f manifests/cronjob.yaml \

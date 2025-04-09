@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . .
 
 # Build static binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/namespace-cleaner
 
 # Stage 2: Minimal runtime image
 FROM debian:bullseye-slim
@@ -20,7 +20,7 @@ RUN apt-get update && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy binary from builder stage
+# Copy the binary from the builder stage to the runtime image
 COPY --from=builder /app/namespace-cleaner /usr/local/bin/namespace-cleaner
 
 # Default command — let Kubernetes override this with args if needed
