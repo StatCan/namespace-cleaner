@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: namespace-cleaner-allow-egress
-  namespace: kubeflow
+  namespace: das
 spec:
   podSelector:
     matchLabels:
