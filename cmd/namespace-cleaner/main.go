@@ -12,6 +12,7 @@ import (
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	odataerrors "github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -61,11 +62,12 @@ func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceCl
 	if err != nil {
 		log.Fatalf("Graph auth failed: %v", err)
 	}
-	adapter, err := msgraphsdk.NewGraphRequestAdapterWithCredential(cred)
+
+	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(cred, []string{"https://graph.microsoft.com/.default"})
 	if err != nil {
-		log.Fatalf("Graph adapter init failed: %v", err)
+		log.Fatalf("Graph client creation failed: %v", err)
 	}
-	return msgraphsdk.NewGraphServiceClient(adapter)
+	return client
 }
 
 func initKubeClient() *kubernetes.Clientset {
@@ -89,11 +91,15 @@ func userExists(ctx context.Context, cfg Config, client *msgraphsdk.GraphService
 		}
 		return false
 	}
+
 	_, err := client.Users().ByUserId(email).Get(ctx, nil)
 	if err != nil {
-		// Adjust error handling to check for the specific ODataError fields
-		if respErr, ok := err.(*odataerrors.ODataError); ok && respErr.Code != "" && respErr.Code == "NotFound" {
-			return false
+		if respErr, ok := err.(*odataerrors.ODataError); ok {
+			if mainError := respErr.GetErrorEscaped(); mainError != nil {
+				if code := mainError.GetCode(); code != nil && *code == "NotFound" {
+					return false
+				}
+			}
 		}
 		log.Printf("Error checking user %s: %v", email, err)
 		return false
@@ -136,7 +142,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				log.Printf("[DRY RUN] Would label %s with delete-at=%s", ns.Name, graceDate)
 			} else {
 				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))
-				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, metav1.MergePatchType, patch, metav1.PatchOptions{})
+				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 				if err != nil {
 					log.Printf("Error patching %s: %v", ns.Name, err)
 				}
@@ -162,7 +168,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 					log.Printf("[DRY RUN] Would remove label from %s", ns.Name)
 				} else {
 					patch := []byte(`{"metadata":{"labels":{"namespace-cleaner/delete-at":null}}}`)
-					_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, metav1.MergePatchType, patch, metav1.PatchOptions{})
+					_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 					if err != nil {
 						log.Printf("Error removing label: %v", err)
 					}
