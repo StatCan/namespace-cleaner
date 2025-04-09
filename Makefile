@@ -1,4 +1,4 @@
-.PHONY: test dry-run run stop clean
+.PHONY: test dry-run run stop clean clean-test
 
 # Local testing (no Azure, real execution)
 test:
@@ -11,12 +11,12 @@ test:
 		--restart=Never \
 		--env DRY_RUN=false \
 		--env TEST_MODE=true \
-		-- ./namespace-cleaner.sh
+		-- ./namespace-cleaner  # Use the Go binary here
 	@echo "\nVerification:"
 	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
 	@make clean-test
 
-# Deploy to production
+# Deploy to production (with the Go binary)
 run:
 	@echo "Deploying namespace cleaner..."
 	kubectl apply -f manifests/configmap.yaml \
@@ -46,7 +46,6 @@ clean-test:
 	kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
 	kubectl delete pod testpod --ignore-not-found
 	kubectl delete job namespace-cleaner-container-job --ignore-not-found
-
 
 # Full cleanup (including production)
 clean: clean-test
