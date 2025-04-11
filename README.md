@@ -68,27 +68,32 @@ git clone https://github.com/bryanpaget/namespace-cleaner.git
 cd namespace-cleaner
 ```
 
-### 2. Test Locally
+### 2. Build
+```bash
+make build  # Build the go code
+```
+
+### 3. Test Locally
 ```bash
 make test  # Run full test suite with cleanup
 ```
 
-### 3. Run in Dry Mode
+### 4. Run in Dry Mode
 ```bash
 make dry-run  # Preview actions without execution
 ```
 
-### 4. Deploy to Production
+### 5. Deploy to Production
 ```bash
 make run  # Applies ConfigMap/Secret and starts CronJob
 ```
 
-### 5. Stop the CronJob (Keep Configurations)
+### 6. Stop the CronJob (Keep Configurations)
 ```bash
 make stop
 ```
 
-### 6. Clean Expired Namespaces
+### 7. Clean Expired Namespaces
 ```bash
 make clean  # Removes all namespace-cleaner resources
 ```
@@ -97,6 +102,7 @@ make clean  # Removes all namespace-cleaner resources
 
 | Command         | Description                                  |
 |----------------|----------------------------------------------|
+| `make build`   | Build the go code                            |
 | `make test`    | Run full test suite on a local cluster      |
 | `make dry-run` | Preview actions without execution           |
 | `make run`     | Deploy the cleaner to production            |
@@ -108,19 +114,15 @@ make clean  # Removes all namespace-cleaner resources
 ### 1. Configure Allowed Domains & Grace Period
 Modify `configmap.yaml`:
 ```yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespace-cleaner-config
+  namespace: das
 data:
-  config.env: |
-    ALLOWED_DOMAINS="yourdomain.com"
-    GRACE_PERIOD="30"  # Days before deletion
-```
-
-### 2. Configure Azure Credentials
-Modify `azure-creds.yaml`:
-```yaml
-stringData:
-  AZURE_TENANT_ID: <tenant-id>
-  AZURE_CLIENT_ID: <client-id>
-  AZURE_CLIENT_SECRET: <client-secret>
+  ALLOWED_DOMAINS: "statcan.gc.ca,cloud.statcan.ca"
+  GRACE_PERIOD: "90d"
 ```
 
 ## Testing Guide
@@ -161,5 +163,4 @@ make stop && make clean && make run
 | Error                        | Possible Solution               |
 |------------------------------|---------------------------------|
 | `Invalid domain`             | Update `ALLOWED_DOMAINS`       |
-| `Azure login failed`         | Verify `secret.yaml` values    |
 | `Namespace not deleted`      | Check `GRACE_PERIOD` setting   |
