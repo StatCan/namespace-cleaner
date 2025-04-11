@@ -17,11 +17,6 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-      - name: Lint Shell Scripts
-        run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck namespace-cleaner.sh
-
       - name: Lint YAML Files
         run: |
           pip install yamllint

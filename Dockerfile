@@ -1,17 +1,33 @@
-FROM mcr.microsoft.com/azure-cli:2.9.1
+# Stage 1: Build Go binary
+FROM golang:1.24.2 as builder
 
-# Install kubectl using Azure CLI
-RUN az aks install-cli
+# Set up Go workspace
+WORKDIR /app
 
-# Set working directory
-WORKDIR /
+# Copy Go source
+COPY . .
 
-# Copy scripts into image
-COPY namespace-cleaner.sh /namespace-cleaner.sh
-COPY entrypoint.sh /entrypoint.sh
+# Build static binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/namespace-cleaner
 
-# Make scripts executable
-RUN chmod +x /namespace-cleaner.sh /entrypoint.sh
+# Stage 2: Minimal runtime image
+FROM debian:bullseye-slim
 
-# Set entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+# Install kubectl with version pinning and cleanup
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates=20210119 \
+    curl=7.74.0-1.3+deb11u14 && \
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl && \
+    apt-get purge -y --auto-remove curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the binary from the builder stage to the runtime image
+COPY --from=builder /app/namespace-cleaner /usr/local/bin/namespace-cleaner
+
+# Default command - let Kubernetes override this with args if needed
+# ENTRYPOINT ["/usr/local/bin/namespace-cleaner"]
+ENTRYPOINT ["/bin/sh"]
