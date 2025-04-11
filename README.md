@@ -1,5 +1,7 @@
 # Kubernetes Namespace Cleaner
 
+![image](https://github.com/user-attachments/assets/7f10d356-9312-4483-aea0-33aeef6880d9)
+
 A Kubernetes CronJob that automatically identifies and cleans up namespaces tied to deprovisioned Azure Entra ID (formerly Azure AD) users.
 
 ## Overview
