@@ -7,7 +7,7 @@ test: build
 		-f tests/test-config.yaml \
 		-f tests/test-cases.yaml
 	kubectl run testpod \
-		--image bitnami/kubectl:latest \
+		--image gcr.io/distroless/static:nonroot \
 		--restart=Never \
 		--env DRY_RUN=false \
 		--env TEST_MODE=true \
