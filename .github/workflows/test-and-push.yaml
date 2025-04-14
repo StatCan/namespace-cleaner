@@ -2,8 +2,8 @@
 name: CI Pipeline
 
 on:
-  - push
-  - pull_request
+  push:
+  pull_request:
 
 jobs:
   pre-build-checks:
@@ -29,28 +29,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Kind cluster
-        uses: helm/kind-action@v1.8.0
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
-          version: "v0.20.0"
+          go-version: '1.24'
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bash
-
-      - name: Run test suite
-        run: |
-          make test
-          make clean
-
-      - name: Debug on failure
-        if: ${{ failure() }}
-        run: |
-          echo "=== Cluster State ==="
-          kubectl get ns,configmaps -o wide
-          echo "=== Cleaner Logs ==="
-          cat /proc/1/fd/1
+      - name: Run Go unit tests
+        run: make test
 
   build-push:
     runs-on: ubuntu-latest
@@ -69,7 +54,8 @@ jobs:
         ports:
           - 5000:5000
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Login to Azure Container Registry
         uses: azure/docker-login@v1
