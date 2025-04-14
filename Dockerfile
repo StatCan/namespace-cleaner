@@ -29,5 +29,4 @@ RUN apt-get update && \
 COPY --from=builder /app/namespace-cleaner /usr/local/bin/namespace-cleaner
 
 # Default command - let Kubernetes override this with args if needed
-# ENTRYPOINT ["/usr/local/bin/namespace-cleaner"]
 ENTRYPOINT ["/bin/sh"]
