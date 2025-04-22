@@ -1,151 +1,210 @@
-// main_test.go
 package main
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
-	// For using a fake Kubernetes client
-	fakeKube "k8s.io/client-go/kubernetes/fake"
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
-// TestGetGracePeriod_Default verifies that when no GRACE_PERIOD env var is set, the default value of 30 is returned.
-func TestGetGracePeriod_Default(t *testing.T) {
-	os.Unsetenv("GRACE_PERIOD")
-	got := getGracePeriod()
-	if got != 30 {
-		t.Errorf("Expected grace period 30, got %d", got)
-	}
-}
-
-// TestGetGracePeriod_FromEnv verifies that getGracePeriod returns the environment-specified value.
-func TestGetGracePeriod_FromEnv(t *testing.T) {
-	os.Setenv("GRACE_PERIOD", "45")
-	defer os.Unsetenv("GRACE_PERIOD")
-	got := getGracePeriod()
-	if got != 45 {
-		t.Errorf("Expected grace period 45, got %d", got)
-	}
-}
-
-// TestValidDomain checks that validDomain properly validates email domains.
-func TestValidDomain(t *testing.T) {
-	domains := []string{"example.com", "test.com"}
-	cases := []struct {
-		email    string
-		expected bool
+func TestGetGracePeriod(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		want     int
 	}{
-		{"user@example.com", true},
-		{"user@test.com", true},
-		{"user@invalid.com", false},
-		{"invalidemail", false},
+		{"Default", "", 30},
+		{"Valid", "7", 7},
+		{"Invalid", "abc", 0},
 	}
-	for _, tc := range cases {
-		got := validDomain(tc.email, domains)
-		if got != tc.expected {
-			t.Errorf("validDomain(%q, %v) = %v; want %v", tc.email, domains, got, tc.expected)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GRACE_PERIOD", tt.envValue)
+			assert.Equal(t, tt.want, getGracePeriod())
+		})
 	}
 }
 
-// TestUserExists_TestMode uses TestMode to avoid depending on an actual Graph client.
-// In TestMode, userExists only checks if the email is in the cfg.TestUsers list.
+func TestValidDomain(t *testing.T) {
+	tests := []struct {
+		email   string
+		domains []string
+		want    bool
+	}{
+		{"user@allowed.com", []string{"allowed.com"}, true},
+		{"user@notallowed.com", []string{"allowed.com"}, false},
+		{"invalid-email", []string{"allowed.com"}, false},
+		{"user@allowed.co.uk", []string{"allowed.com", "allowed.co.uk"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.email, func(t *testing.T) {
+			assert.Equal(t, tt.want, validDomain(tt.email, tt.domains))
+		})
+	}
+}
+
 func TestUserExists_TestMode(t *testing.T) {
-	ctx := context.Background()
 	cfg := Config{
 		TestMode:  true,
-		TestUsers: []string{"test@example.com", "hello@test.com"},
+		TestUsers: []string{"test@example.com"},
 	}
-	// The graph client isn't used in TestMode.
-	var dummyGraphClient *msgraphsdk.GraphServiceClient
 
-	cases := []struct {
-		email    string
-		expected bool
+	tests := []struct {
+		email string
+		want  bool
 	}{
 		{"test@example.com", true},
 		{"notfound@example.com", false},
 	}
-	for _, tc := range cases {
-		got := userExists(ctx, cfg, dummyGraphClient, tc.email)
-		if got != tc.expected {
-			t.Errorf("userExists(%q) = %v; want %v", tc.email, got, tc.expected)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.email, func(t *testing.T) {
+			assert.Equal(t, tt.want, userExists(context.Background(), cfg, nil, tt.email))
+		})
 	}
 }
 
-// TestProcessNamespaces_DryRun demonstrates a simple test of processNamespaces using a fake Kubernetes client.
-// This test creates two namespaces:
-// - "test-ns-1" with a valid domain and owner (that exists in TestUsers),
-// - "test-ns-2" with an invalid domain.
-// In DryRun mode, the function should simply log the actions without modifying any namespaces.
-func TestProcessNamespaces_DryRun(t *testing.T) {
-	ctx := context.Background()
+func TestProcessNamespaces(t *testing.T) {
+	now := time.Now()
+	gracePeriod := 7
+	graceDate := now.AddDate(0, 0, gracePeriod).Format("2006-01-02")
+	pastDate := now.AddDate(0, 0, -1).Format("2006-01-02")
+	futureDate := now.AddDate(0, 0, 1).Format("2006-01-02")
 
-	// Create a fake kube client with two namespaces.
-	kube := fakeKube.NewSimpleClientset(
-		// A namespace with a valid owner (belongs to allowed domain, and exists in TestUsers)
-		&metav1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-ns-1",
-				Labels: map[string]string{
-					"app.kubernetes.io/part-of": "kubeflow-profile",
-				},
-				Annotations: map[string]string{
-					"owner": "test@example.com",
-				},
-			},
-		},
-		// A namespace with an invalid domain (will be skipped)
-		&metav1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-ns-2",
-				Labels: map[string]string{
-					"app.kubernetes.io/part-of": "kubeflow-profile",
-				},
-				Annotations: map[string]string{
-					"owner": "user@notallowed.com",
+	testCases := []struct {
+		name            string
+		namespaces      []runtime.Object
+		config          Config
+		expectedPatches int
+		expectedDeletes int
+	}{
+		{
+			name: "Mark namespace for deletion when user doesn't exist",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-ns",
+						Labels: map[string]string{
+							"app.kubernetes.io/part-of": "kubeflow-profile",
+						},
+						Annotations: map[string]string{
+							"owner": "nonexistent@example.com",
+						},
+					},
 				},
 			},
+			config: Config{
+				TestMode:       true,
+				TestUsers:      []string{"test@example.com"},
+				AllowedDomains: []string{"example.com"},
+				DryRun:         false,
+				GracePeriod:    gracePeriod,
+			},
+			expectedPatches: 1,
+			expectedDeletes: 0,
 		},
-	)
-
-	// In TestMode, the graph client is not used.
-	var dummyGraphClient *msgraphsdk.GraphServiceClient
-
-	cfg := Config{
-		TestMode:       true,
-		DryRun:         true,
-		AllowedDomains: []string{"example.com"},
-		TestUsers:      []string{"test@example.com"},
-		GracePeriod:    30,
+		{
+			name: "Dry run doesn't modify namespaces",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-ns",
+						Labels: map[string]string{
+							"app.kubernetes.io/part-of": "kubeflow-profile",
+						},
+						Annotations: map[string]string{
+							"owner": "nonexistent@example.com",
+						},
+					},
+				},
+			},
+			config: Config{
+				TestMode:       true,
+				TestUsers:      []string{"test@example.com"},
+				AllowedDomains: []string{"example.com"},
+				DryRun:         true,
+				GracePeriod:    gracePeriod,
+			},
+			expectedPatches: 0,
+			expectedDeletes: 0,
+		},
+		{
+			name: "Delete expired namespace when user doesn't exist",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "expired-ns",
+						Labels: map[string]string{
+							"namespace-cleaner/delete-at": pastDate,
+						},
+						Annotations: map[string]string{
+							"owner": "nonexistent@example.com",
+						},
+					},
+				},
+			},
+			config: Config{
+				TestMode:       true,
+				TestUsers:      []string{"test@example.com"},
+				AllowedDomains: []string{"example.com"},
+				DryRun:         false,
+				GracePeriod:    gracePeriod,
+			},
+			expectedPatches: 0,
+			expectedDeletes: 1,
+		},
+		{
+			name: "Remove label when user recovers",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "recovered-ns",
+						Labels: map[string]string{
+							"namespace-cleaner/delete-at": futureDate,
+						},
+						Annotations: map[string]string{
+							"owner": "test@example.com",
+						},
+					},
+				},
+			},
+			config: Config{
+				TestMode:       true,
+				TestUsers:      []string{"test@example.com"},
+				AllowedDomains: []string{"example.com"},
+				DryRun:         false,
+				GracePeriod:    gracePeriod,
+			},
+			expectedPatches: 1,
+			expectedDeletes: 0,
+		},
 	}
 
-	// Call processNamespaces. Since DryRun is true, no patch or deletion should be performed.
-	processNamespaces(ctx, dummyGraphClient, kube, cfg)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset(tc.namespaces...)
+			processNamespaces(context.Background(), nil, client, tc.config)
 
-	// Retrieve the namespaces after processing.
-	ns1, err := kube.CoreV1().Namespaces().Get(ctx, "test-ns-1", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error getting namespace 'test-ns-1': %v", err)
-	}
-	ns2, err := kube.CoreV1().Namespaces().Get(ctx, "test-ns-2", metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error getting namespace 'test-ns-2': %v", err)
-	}
+			patches := 0
+			deletes := 0
+			for _, action := range client.Actions() {
+				if action.Matches("patch", "namespaces") {
+					patches++
+				}
+				if action.Matches("delete", "namespaces") {
+					deletes++
+				}
+			}
 
-	// Since "test-ns-1" has a valid owner (and the user exists in TestUsers),
-	// it should not have been marked with a deletion label.
-	if label, found := ns1.Labels["namespace-cleaner/delete-at"]; found && strings.TrimSpace(label) != "" {
-		t.Errorf("Expected no deletion label on 'test-ns-1', but found label: %s", label)
-	}
-
-	// "test-ns-2" has an invalid domain so processNamespaces should simply log and not patch it.
-	if label, found := ns2.Labels["namespace-cleaner/delete-at"]; found && strings.TrimSpace(label) != "" {
-		t.Errorf("Expected no deletion label on 'test-ns-2' (invalid domain), but found label: %s", label)
+			assert.Equal(t, tc.expectedPatches, patches, "unexpected number of patches")
+			assert.Equal(t, tc.expectedDeletes, deletes, "unexpected number of deletes")
+		})
 	}
 }

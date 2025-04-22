@@ -5,6 +5,7 @@ go 1.24.2
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0
 	github.com/microsoftgraph/msgraph-sdk-go v1.67.1
+	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
 )
