@@ -121,7 +121,8 @@ func validDomain(email string, domains []string) bool {
 	return false
 }
 
-func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient, kube *kubernetes.Clientset, cfg Config) {
+func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient, kube kubernetes.Interface, cfg Config) {
+	// Process namespaces without delete-at label
 	nsList, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/part-of=kubeflow-profile,!namespace-cleaner/delete-at",
 	})
@@ -150,6 +151,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		}
 	}
 
+	// Process namespaces with delete-at label
 	expired, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "namespace-cleaner/delete-at",
 	})
@@ -157,31 +159,33 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		log.Fatalf("Error listing expired namespaces: %v", err)
 	}
 	today := time.Now()
+
 	for _, ns := range expired.Items {
 		label := ns.Labels["namespace-cleaner/delete-at"]
 		deletionDate, _ := time.Parse("2006-01-02", label)
 		email := ns.Annotations["owner"]
-		if today.After(deletionDate) {
-			if userExists(ctx, cfg, graph, email) {
-				log.Printf("User restored, removing delete-at from %s", ns.Name)
-				if cfg.DryRun {
-					log.Printf("[DRY RUN] Would remove label from %s", ns.Name)
-				} else {
-					patch := []byte(`{"metadata":{"labels":{"namespace-cleaner/delete-at":null}}}`)
-					_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
-					if err != nil {
-						log.Printf("Error removing label: %v", err)
-					}
-				}
+
+		// Check if user exists FIRST
+		if userExists(ctx, cfg, graph, email) {
+			log.Printf("User restored, removing delete-at from %s", ns.Name)
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] Would remove label from %s", ns.Name)
 			} else {
-				log.Printf("Deleting namespace: %s", ns.Name)
-				if cfg.DryRun {
-					log.Printf("[DRY RUN] Would delete %s", ns.Name)
-				} else {
-					err := kube.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
-					if err != nil {
-						log.Printf("Error deleting ns: %v", err)
-					}
+				patch := []byte(`{"metadata":{"labels":{"namespace-cleaner/delete-at":null}}}`)
+				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+				if err != nil {
+					log.Printf("Error removing label: %v", err)
+				}
+			}
+		} else if today.After(deletionDate) {
+			// Only delete if user doesn't exist AND date has passed
+			log.Printf("Deleting namespace: %s", ns.Name)
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] Would delete %s", ns.Name)
+			} else {
+				err := kube.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
+				if err != nil {
+					log.Printf("Error deleting ns: %v", err)
 				}
 			}
 		}

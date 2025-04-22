@@ -74,7 +74,6 @@ func TestUserExists_TestMode(t *testing.T) {
 func TestProcessNamespaces(t *testing.T) {
 	now := time.Now()
 	gracePeriod := 7
-	graceDate := now.AddDate(0, 0, gracePeriod).Format("2006-01-02")
 	pastDate := now.AddDate(0, 0, -1).Format("2006-01-02")
 	futureDate := now.AddDate(0, 0, 1).Format("2006-01-02")
 
