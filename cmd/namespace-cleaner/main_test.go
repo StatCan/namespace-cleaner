@@ -10,13 +10,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 type NamespaceCleanerTestSuite struct {
 	suite.Suite
-	client    kubernetes.Interface
+	client    *fake.Clientset
 	ctx       context.Context
 	config    Config
 	graceDate string
@@ -137,26 +136,17 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			// Setup test client
 			s.client = fake.NewSimpleClientset(tc.namespaces...)
 			s.printNamespaceState("Initial State")
 
-			// Run the processor
 			processNamespaces(s.ctx, nil, s.client, s.config)
-
-			// Show final state
 			s.printNamespaceState("Final State")
 
-			// Collect actions
-			var actions []string
-			for _, action := range s.client.Actions() {
-				actions = append(actions, action.GetVerb()+" "+action.GetResource().Resource)
-			}
+			actions := s.client.Actions()
 			s.T().Logf("Performed actions: %v", actions)
 
-			// Verify actions
 			patches, deletes := 0, 0
-			for _, action := range s.client.Actions() {
+			for _, action := range actions {
 				if action.Matches("patch", "namespaces") {
 					patches++
 				}
@@ -165,8 +155,8 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 				}
 			}
 
-			assert.Equal(s.T(), tc.expectedPatches, patches, "Unexpected number of patches")
-			assert.Equal(s.T(), tc.expectedDeletes, deletes, "Unexpected number of deletes")
+			assert.Equal(s.T(), tc.expectedPatches, patches, "Patch count mismatch")
+			assert.Equal(s.T(), tc.expectedDeletes, deletes, "Delete count mismatch")
 		})
 	}
 }
