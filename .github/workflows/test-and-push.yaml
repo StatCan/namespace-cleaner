@@ -49,8 +49,12 @@ jobs:
         run: |
           echo "=== Cluster State ==="
           kubectl get ns,configmaps -o wide
-          echo "=== Cleaner Logs ==="
-          cat /proc/1/fd/1
+          echo "\n=== Namespace Details ==="
+          kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\tLabels: "}{.metadata.labels}{"\tAnnotations: "}{.metadata.annotations}{"\n"}{end}'
+          echo "\n=== Cleaner Logs ==="
+          kubectl logs testpod || true
+          echo "\n=== Events ==="
+          kubectl get events --sort-by=.metadata.creationTimestamp
 
   build-push:
     runs-on: ubuntu-latest

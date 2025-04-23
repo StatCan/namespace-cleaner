@@ -3,18 +3,30 @@
 # Local testing (no Azure, real execution)
 test: build
 	@echo "Running local test suite..."
-	kubectl apply \
-		-f tests/test-config.yaml \
-		-f tests/test-cases.yaml
+	@echo "\n=== Applying test resources ==="
+	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
+
+	@echo "\n=== Initial namespace state ==="
+	@kubectl get ns --show-labels -l app.kubernetes.io/part-of=kubeflow-profile
+	@echo "\n=== Namespace annotations ==="
+	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.owner}{"\n"}{end}'
+
+	@echo "\n=== Starting test pod ==="
 	kubectl run testpod \
 		--image bitnami/kubectl:latest \
 		--restart=Never \
 		--env DRY_RUN=false \
 		--env TEST_MODE=true \
 		-- ./namespace-cleaner
-	@echo "\nVerification:"
-	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
-	@make clean-test
+
+	@echo "\n=== Post-execution namespace state ==="
+	@kubectl get ns --show-labels -l app.kubernetes.io/part-of=kubeflow-profile
+	@echo "\n=== Post-execution annotations ==="
+	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.owner}{"\n"}{end}'
+	@echo "\n=== Cleaner labels details ==="
+	@kubectl get ns -l namespace-cleaner/delete-at -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels}{"\n"}{end}'
+
+	@make clean-testw
 
 # Build Go binary
 build:
