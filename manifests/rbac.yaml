@@ -1,24 +1,27 @@
----
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: namespace-cleaner-reader
-  namespace: das
+  name: namespace-cleaner
 rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: namespace-cleaner-bind
-  namespace: das
 subjects:
   - kind: ServiceAccount
     name: namespace-cleaner
     namespace: das
 roleRef:
-  kind: Role
-  name: namespace-cleaner-reader
+  kind: ClusterRole
+  name: namespace-cleaner
   apiGroup: rbac.authorization.k8s.io
