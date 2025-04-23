@@ -6,11 +6,170 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+type NamespaceCleanerTestSuite struct {
+	suite.Suite
+	client    kubernetes.Interface
+	ctx       context.Context
+	config    Config
+	graceDate string
+}
+
+func TestNamespaceCleanerSuite(t *testing.T) {
+	suite.Run(t, new(NamespaceCleanerTestSuite))
+}
+
+func (s *NamespaceCleanerTestSuite) SetupTest() {
+	s.ctx = context.Background()
+	s.graceDate = time.Now().AddDate(0, 0, 7).Format("2006-01-02")
+	s.config = Config{
+		TestMode:       true,
+		TestUsers:      []string{"test@example.com"},
+		AllowedDomains: []string{"example.com"},
+		DryRun:         false,
+		GracePeriod:    7,
+	}
+}
+
+func (s *NamespaceCleanerTestSuite) printNamespaceState(header string) {
+	s.T().Logf("\n=== %s ===", header)
+	namespaces, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
+
+	for _, ns := range namespaces.Items {
+		s.T().Logf("Namespace: %s", ns.Name)
+		s.T().Logf("  Labels:      %v", ns.Labels)
+		s.T().Logf("  Annotations: %v", ns.Annotations)
+		s.T().Log("-----------------------------------")
+	}
+}
+
+func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
+	now := time.Now()
+	pastDate := now.AddDate(0, 0, -1).Format("2006-01-02")
+	futureDate := now.AddDate(0, 0, 1).Format("2006-01-02")
+
+	testCases := []struct {
+		name            string
+		namespaces      []runtime.Object
+		expectedPatches int
+		expectedDeletes int
+	}{
+		{
+			name: "Mark namespace for deletion when user doesn't exist",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-ns",
+						Labels: map[string]string{
+							"app.kubernetes.io/part-of": "kubeflow-profile",
+						},
+						Annotations: map[string]string{
+							"owner": "nonexistent@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 1,
+			expectedDeletes: 0,
+		},
+		{
+			name: "Dry run doesn't modify namespaces",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-ns",
+						Labels: map[string]string{
+							"app.kubernetes.io/part-of": "kubeflow-profile",
+						},
+						Annotations: map[string]string{
+							"owner": "nonexistent@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 0,
+			expectedDeletes: 0,
+		},
+		{
+			name: "Delete expired namespace when user doesn't exist",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "expired-ns",
+						Labels: map[string]string{
+							"namespace-cleaner/delete-at": pastDate,
+						},
+						Annotations: map[string]string{
+							"owner": "nonexistent@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 0,
+			expectedDeletes: 1,
+		},
+		{
+			name: "Remove label when user recovers",
+			namespaces: []runtime.Object{
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "recovered-ns",
+						Labels: map[string]string{
+							"namespace-cleaner/delete-at": futureDate,
+						},
+						Annotations: map[string]string{
+							"owner": "test@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 1,
+			expectedDeletes: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			// Setup test client
+			s.client = fake.NewSimpleClientset(tc.namespaces...)
+			s.printNamespaceState("Initial State")
+
+			// Run the processor
+			processNamespaces(s.ctx, nil, s.client, s.config)
+
+			// Show final state
+			s.printNamespaceState("Final State")
+
+			// Collect actions
+			var actions []string
+			for _, action := range s.client.Actions() {
+				actions = append(actions, action.GetVerb()+" "+action.GetResource().Resource)
+			}
+			s.T().Logf("Performed actions: %v", actions)
+
+			// Verify actions
+			patches, deletes := 0, 0
+			for _, action := range s.client.Actions() {
+				if action.Matches("patch", "namespaces") {
+					patches++
+				}
+				if action.Matches("delete", "namespaces") {
+					deletes++
+				}
+			}
+
+			assert.Equal(s.T(), tc.expectedPatches, patches, "Unexpected number of patches")
+			assert.Equal(s.T(), tc.expectedDeletes, deletes, "Unexpected number of deletes")
+		})
+	}
+}
 
 func TestGetGracePeriod(t *testing.T) {
 	tests := []struct {
@@ -67,143 +226,6 @@ func TestUserExists_TestMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.email, func(t *testing.T) {
 			assert.Equal(t, tt.want, userExists(context.Background(), cfg, nil, tt.email))
-		})
-	}
-}
-
-func TestProcessNamespaces(t *testing.T) {
-	now := time.Now()
-	gracePeriod := 7
-	pastDate := now.AddDate(0, 0, -1).Format("2006-01-02")
-	futureDate := now.AddDate(0, 0, 1).Format("2006-01-02")
-
-	testCases := []struct {
-		name            string
-		namespaces      []runtime.Object
-		config          Config
-		expectedPatches int
-		expectedDeletes int
-	}{
-		{
-			name: "Mark namespace for deletion when user doesn't exist",
-			namespaces: []runtime.Object{
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-ns",
-						Labels: map[string]string{
-							"app.kubernetes.io/part-of": "kubeflow-profile",
-						},
-						Annotations: map[string]string{
-							"owner": "nonexistent@example.com",
-						},
-					},
-				},
-			},
-			config: Config{
-				TestMode:       true,
-				TestUsers:      []string{"test@example.com"},
-				AllowedDomains: []string{"example.com"},
-				DryRun:         false,
-				GracePeriod:    gracePeriod,
-			},
-			expectedPatches: 1,
-			expectedDeletes: 0,
-		},
-		{
-			name: "Dry run doesn't modify namespaces",
-			namespaces: []runtime.Object{
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-ns",
-						Labels: map[string]string{
-							"app.kubernetes.io/part-of": "kubeflow-profile",
-						},
-						Annotations: map[string]string{
-							"owner": "nonexistent@example.com",
-						},
-					},
-				},
-			},
-			config: Config{
-				TestMode:       true,
-				TestUsers:      []string{"test@example.com"},
-				AllowedDomains: []string{"example.com"},
-				DryRun:         true,
-				GracePeriod:    gracePeriod,
-			},
-			expectedPatches: 0,
-			expectedDeletes: 0,
-		},
-		{
-			name: "Delete expired namespace when user doesn't exist",
-			namespaces: []runtime.Object{
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "expired-ns",
-						Labels: map[string]string{
-							"namespace-cleaner/delete-at": pastDate,
-						},
-						Annotations: map[string]string{
-							"owner": "nonexistent@example.com",
-						},
-					},
-				},
-			},
-			config: Config{
-				TestMode:       true,
-				TestUsers:      []string{"test@example.com"},
-				AllowedDomains: []string{"example.com"},
-				DryRun:         false,
-				GracePeriod:    gracePeriod,
-			},
-			expectedPatches: 0,
-			expectedDeletes: 1,
-		},
-		{
-			name: "Remove label when user recovers",
-			namespaces: []runtime.Object{
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "recovered-ns",
-						Labels: map[string]string{
-							"namespace-cleaner/delete-at": futureDate,
-						},
-						Annotations: map[string]string{
-							"owner": "test@example.com",
-						},
-					},
-				},
-			},
-			config: Config{
-				TestMode:       true,
-				TestUsers:      []string{"test@example.com"},
-				AllowedDomains: []string{"example.com"},
-				DryRun:         false,
-				GracePeriod:    gracePeriod,
-			},
-			expectedPatches: 1,
-			expectedDeletes: 0,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(tc.namespaces...)
-			processNamespaces(context.Background(), nil, client, tc.config)
-
-			patches := 0
-			deletes := 0
-			for _, action := range client.Actions() {
-				if action.Matches("patch", "namespaces") {
-					patches++
-				}
-				if action.Matches("delete", "namespaces") {
-					deletes++
-				}
-			}
-
-			assert.Equal(t, tc.expectedPatches, patches, "unexpected number of patches")
-			assert.Equal(t, tc.expectedDeletes, deletes, "unexpected number of deletes")
 		})
 	}
 }
