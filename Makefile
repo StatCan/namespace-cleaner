@@ -26,7 +26,7 @@ test: build
 	@echo "\n=== Cleaner labels details ==="
 	@kubectl get ns -l namespace-cleaner/delete-at -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels}{"\n"}{end}'
 
-	@make clean-testw
+	@make clean-test
 
 # Build Go binary
 build:
