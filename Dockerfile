@@ -9,4 +9,4 @@ FROM gcr.io/distroless/static:nonroot
 COPY --from=builder /app/namespace-cleaner /usr/local/bin/namespace-cleaner
 USER nonroot:nonroot
 
-ENTRYPOINT ["/bin/sh"]
+ENTRYPOINT ["/namespace-cleaner"]

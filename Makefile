@@ -18,7 +18,8 @@ test-integration: docker-build
 		--image=namespace-cleaner:test \
 		--restart=Never \
 		--env="DRY_RUN=false" \
-		--env="TEST_MODE=true"
+		--env="TEST_MODE=true" \
+		--command -- /namespace-cleaner  # Add this line
 	@echo "Waiting for pod to be ready..."
 	@kubectl wait --for=condition=Ready pod/testpod --timeout=120s
 	@echo "Test logs:"
