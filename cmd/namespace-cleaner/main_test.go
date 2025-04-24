@@ -139,7 +139,17 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			s.client = fake.NewSimpleClientset(tc.namespaces...)
 			s.printNamespaceState("Initial State")
 
+			// Save original config and modify DryRun for this test case if needed
+			originalDryRun := s.config.DryRun
+			if tc.name == "Dry run doesn't modify namespaces" {
+				s.config.DryRun = true
+			}
+
 			processNamespaces(s.ctx, nil, s.client, s.config)
+
+			// Restore original DryRun setting
+			s.config.DryRun = originalDryRun
+
 			s.printNamespaceState("Final State")
 
 			actions := s.client.Actions()
