@@ -1,8 +1,16 @@
-.PHONY: test dry-run run stop clean clean-test build
+.PHONY: test-unit test-integration dry-run run stop clean clean-test build
 
-# Local testing with improved debugging
-test: build
-	@echo "Running local test suite..."
+# Run all tests (unit + integration)
+test: test-unit test-integration
+
+# Unit tests with coverage and race detection
+test-unit:
+	@echo "Running unit tests..."
+	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+# Integration tests with Kubernetes cluster
+test-integration: build
+	@echo "Running integration test suite..."
 	@echo "\n=== Creating test environment ==="
 	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
 

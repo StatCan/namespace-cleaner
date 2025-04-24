@@ -1,4 +1,3 @@
----
 name: CI Pipeline
 
 on:
@@ -22,9 +21,30 @@ jobs:
           pip install yamllint
           yamllint .
 
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
     needs: pre-build-checks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Run unit tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage.out
+          flags: unittests
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [pre-build-checks, unit-tests]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,9 +59,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bash
 
-      - name: Run test suite
+      - name: Run integration tests
         run: |
-          make test
+          make test-integration
           make clean
 
       - name: Debug on failure
@@ -58,7 +78,8 @@ jobs:
 
   build-push:
     runs-on: ubuntu-latest
-    needs: test
+    needs: integration-tests
+    # ... rest of build-push job remains unchanged ...
     env:
       REGISTRY_NAME: k8scc01covidacr
       LOCAL_REPO: localhost:5000
