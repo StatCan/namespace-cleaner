@@ -1,4 +1,4 @@
-.PHONY: test-unit test-integration dry-run run stop clean clean-test build
+.PHONY: test-unit test-integration dry-run run stop clean clean-test build docker-build
 
 # Run all tests (unit + integration)
 test: test-unit test-integration
@@ -10,43 +10,27 @@ test-unit:
 
 # Integration tests with Kubernetes cluster
 test-integration: docker-build
-	@echo "Running integration test suite..."
-	@echo "\n=== Creating test environment ==="
-	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
-
-	@echo "\n=== Loading test image into cluster ==="
+	@echo "Running integration tests..."
 	kind load docker-image namespace-cleaner:test
-
-	@echo "\n=== Initial namespace state ==="
-	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile \
-		-o custom-columns=NAME:.metadata.name,LABELS:.metadata.labels,ANNOTATIONS:.metadata.annotations
-
-	@echo "\n=== Starting test execution ==="
+	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
+	@echo "Starting test pod..."
 	kubectl run testpod \
-		--image namespace-cleaner:test \
+		--image=namespace-cleaner:test \
 		--restart=Never \
-		--env DRY_RUN=false \
-		--env TEST_MODE=true
-	@echo "Waiting for pod to start..."
-	@kubectl wait --for=condition=Ready pod/testpod --timeout=30s || (kubectl describe pod/testpod; exit 1)
-
-	@echo "\n=== Post-test namespace state ==="
-	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile \
-		-o custom-columns=NAME:.metadata.name,LABELS:.metadata.labels,ANNOTATIONS:.metadata.annotations
-
-	@echo "\n=== Cleanup candidates ==="
-	@kubectl get ns -l namespace-cleaner/delete-at \
-		-o custom-columns=NAME:.metadata.name,DELETE_AT:.metadata.labels.namespace-cleaner/delete-at
-
-	@echo "\n=== Verification output ==="
-	@kubectl logs testpod --tail=-1 || true
+		--env="DRY_RUN=false" \
+		--env="TEST_MODE=true"
+	@echo "Waiting for pod to be ready..."
+	@kubectl wait --for=condition=Ready pod/testpod --timeout=120s
+	@echo "Test logs:"
+	@kubectl logs testpod --tail=-1
 	@make clean-test
 
+# Build Docker image for testing
 docker-build:
 	@echo "Building Docker image..."
 	docker build -t namespace-cleaner:test .
 
-# Build Go binary
+# Build Go binary (for direct execution)
 build:
 	@echo "Building namespace-cleaner binary..."
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/namespace-cleaner
@@ -83,7 +67,6 @@ stop:
 clean-test:
 	@echo "\n=== Pre-cleanup state ==="
 	@kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\tLabels: "}{.metadata.labels}{"\tAnnotations: "}{.metadata.annotations}{"\n"}{end}' || true
-
 	@echo "Cleaning test resources..."
 	@-kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
 	@-kubectl delete pod/testpod --ignore-not-found

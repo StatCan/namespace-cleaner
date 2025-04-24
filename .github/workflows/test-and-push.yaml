@@ -1,8 +1,6 @@
 name: CI Pipeline
 
-on:
-  - push
-  - pull_request
+on: [push, pull_request]
 
 jobs:
   pre-build-checks:
@@ -34,7 +32,7 @@ jobs:
           go-version: "1.21"
 
       - name: Run unit tests
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: make test-unit
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
@@ -73,17 +71,14 @@ jobs:
       - name: Run integration tests
         run: |
           make test-integration
-          make clean
 
       - name: Debug on failure
         if: ${{ failure() }}
         run: |
           echo "=== Cluster State ==="
-          kubectl get ns,configmaps -o wide
-          echo "\n=== Namespace Details ==="
-          kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\tLabels: "}{.metadata.labels}{"\tAnnotations: "}{.metadata.annotations}{"\n"}{end}'
-          echo "\n=== Cleaner Logs ==="
-          kubectl logs testpod || true
+          kubectl get all -A
+          echo "\n=== Pod Details ==="
+          kubectl describe pod/testpod
           echo "\n=== Events ==="
           kubectl get events --sort-by=.metadata.creationTimestamp
 
