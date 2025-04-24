@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-.PHONY: test build clean
-
-# Run unit tests only
-test:
-	@echo "Running Go unit tests..."
-	go test -v ./...
-=======
 .PHONY: test-unit test-integration dry-run run stop clean clean-test build
 
 # Run all tests (unit + integration)
@@ -47,19 +39,12 @@ test-integration: build
 	@echo "\n=== Verification output ==="
 	@kubectl logs testpod --tail=-1 || true
 	@make clean-test
->>>>>>> bryan-add-more-debugging
 
-# Build the Go binary (if needed by tests or locally)
+# Build Go binary
 build:
 	@echo "Building namespace-cleaner binary..."
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/namespace-cleaner
 
-<<<<<<< HEAD
-# Clean up local build artifacts (now only removing the binary)
-clean:
-	@echo "Cleaning local build artifacts..."
-	-rm -f namespace-cleaner
-=======
 # Deploy to production
 run: build
 	@echo "Deploying namespace cleaner..."
@@ -111,4 +96,3 @@ clean: clean-test
 				   -f manifests/serviceaccount.yaml --ignore-not-found
 	@echo "\n=== Final cluster state ==="
 	@kubectl get all -l app=namespace-cleaner
->>>>>>> bryan-add-more-debugging
