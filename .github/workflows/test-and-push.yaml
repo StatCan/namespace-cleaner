@@ -63,6 +63,11 @@ jobs:
               - hostPath: /var/run/docker.sock
                 containerPath: /var/run/docker.sock
 
+      - name: Verify cluster access
+        run: |
+          kubectl cluster-info
+          kubectl wait --for=condition=Ready nodes --all --timeout=120s
+
       - name: Build and load image
         run: |
           make docker-build
@@ -75,11 +80,8 @@ jobs:
       - name: Debug on failure
         if: ${{ failure() }}
         run: |
-          echo "=== Cluster State ==="
           kubectl get all -A
-          echo "\n=== Pod Details ==="
           kubectl describe pod/testpod
-          echo "\n=== Events ==="
           kubectl get events --sort-by=.metadata.creationTimestamp
 
   build-push:
