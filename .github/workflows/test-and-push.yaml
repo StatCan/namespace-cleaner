@@ -1,4 +1,3 @@
----
 name: CI Pipeline
 
 on:
@@ -22,24 +21,75 @@ jobs:
           pip install yamllint
           yamllint .
 
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
     needs: pre-build-checks
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+<<<<<<< HEAD
       - name: Setup Go
         uses: actions/setup-go@v4
+=======
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Run unit tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage.out
+          flags: unittests
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [pre-build-checks, unit-tests]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Kind cluster
+        uses: helm/kind-action@v1.8.0
+>>>>>>> bryan-add-more-debugging
         with:
           go-version: '1.24'
 
+<<<<<<< HEAD
       - name: Run Go unit tests
         run: make test
+=======
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bash
+
+      - name: Run integration tests
+        run: |
+          make test-integration
+          make clean
+
+      - name: Debug on failure
+        if: ${{ failure() }}
+        run: |
+          echo "=== Cluster State ==="
+          kubectl get ns,configmaps -o wide
+          echo "\n=== Namespace Details ==="
+          kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\tLabels: "}{.metadata.labels}{"\tAnnotations: "}{.metadata.annotations}{"\n"}{end}'
+          echo "\n=== Cleaner Logs ==="
+          kubectl logs testpod || true
+          echo "\n=== Events ==="
+          kubectl get events --sort-by=.metadata.creationTimestamp
+>>>>>>> bryan-add-more-debugging
 
   build-push:
     runs-on: ubuntu-latest
-    needs: test
+    needs: integration-tests
+    # ... rest of build-push job remains unchanged ...
     env:
       REGISTRY_NAME: k8scc01covidacr
       LOCAL_REPO: localhost:5000
