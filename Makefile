@@ -9,10 +9,13 @@ test-unit:
 	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
 # Integration tests with Kubernetes cluster
-test-integration: build
+test-integration: docker-build
 	@echo "Running integration test suite..."
 	@echo "\n=== Creating test environment ==="
 	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
+
+	@echo "\n=== Loading test image into cluster ==="
+	kind load docker-image namespace-cleaner:test
 
 	@echo "\n=== Initial namespace state ==="
 	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile \
@@ -20,11 +23,10 @@ test-integration: build
 
 	@echo "\n=== Starting test execution ==="
 	kubectl run testpod \
-		--image gcr.io/distroless/static:nonroot \
+		--image namespace-cleaner:test \
 		--restart=Never \
 		--env DRY_RUN=false \
-		--env TEST_MODE=true \
-		--command -- /usr/local/bin/namespace-cleaner
+		--env TEST_MODE=true
 	@echo "Waiting for pod to start..."
 	@kubectl wait --for=condition=Ready pod/testpod --timeout=30s || (kubectl describe pod/testpod; exit 1)
 
@@ -39,6 +41,10 @@ test-integration: build
 	@echo "\n=== Verification output ==="
 	@kubectl logs testpod --tail=-1 || true
 	@make clean-test
+
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t namespace-cleaner:test .
 
 # Build Go binary
 build:
