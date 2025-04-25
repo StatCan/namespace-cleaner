@@ -20,6 +20,7 @@ test-integration: docker-build
 		--restart=Never \
 		--env="DRY_RUN=false" \
 		--env="TEST_MODE=true" \
+		--env-from=configmap/namespace-cleaner-config
 		--command -- sh -c "/namespace-cleaner || sleep 300"  # Keep container alive on failure
 
 	@echo "Waiting for logs..."
