@@ -29,7 +29,7 @@ test-integration: docker-build
 
 	@echo "Pod status:"
 	@kubectl get pod testpod -o wide
-	@make clean-testtest-integration: docker-build
+	@make clean-test
 
 # Build Docker image for testing
 docker-build:
