@@ -6,5 +6,6 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/na
 
 FROM gcr.io/distroless/static:nonroot
 
-COPY --from=builder /app/namespace-cleaner /usr/local/bin/namespace-cleaner
+COPY --from=builder /app/namespace-cleaner /namespace-cleaner
+RUN chmod +x /namespace-cleaner
 USER nonroot:nonroot
