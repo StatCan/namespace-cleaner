@@ -32,6 +32,12 @@ jobs:
         with:
           go-version: "1.21"
 
+      - name: Clean Go cache
+        run: |
+          go clean -cache
+          go clean -modcache
+          sudo rm -rf /usr/local/go/pkg || true
+
       - name: Run unit tests
         run: make test-unit
 
