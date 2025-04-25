@@ -58,7 +58,18 @@ func getGracePeriod() int {
 }
 
 func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceClient {
-	cred, err := msauth.NewClientSecretCredential(cfg.TenantID, cfg.ClientID, cfg.ClientSecret, nil)
+	if cfg.TestMode {
+		// Return mock client for tests
+		return &msgraphsdk.GraphServiceClient{}
+	}
+
+	// Real authentication only in non-test mode
+	cred, err := msauth.NewClientSecretCredential(
+		cfg.TenantID,
+		cfg.ClientID,
+		cfg.ClientSecret,
+		nil,
+	)
 	if err != nil {
 		log.Fatalf("Graph auth failed: %v", err)
 	}

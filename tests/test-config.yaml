@@ -12,5 +12,12 @@ kind: ConfigMap
 metadata:
   name: namespace-cleaner-config
 data:
-  ALLOWED_DOMAINS: "company.com,example.org"
-  GRACE_PERIOD: "0d"
+  TEST_MODE: "true"
+  DRY_RUN: "true"
+  ALLOWED_DOMAINS: "example.com,test.com"
+  TEST_USERS: "test1@example.com,test2@example.com"
+  GRACE_PERIOD: "30"
+  # These can be dummy values in test mode
+  CLIENT_ID: "dummy-client-id"
+  CLIENT_SECRET: "dummy-secret"
+  TENANT_ID: "dummy-tenant"
