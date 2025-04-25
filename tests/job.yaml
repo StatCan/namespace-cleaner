@@ -6,11 +6,10 @@ metadata:
 spec:
   template:
     spec:
-      serviceAccountName: namespace-cleaner
       containers:
         - name: test-container
-          image: namespace-cleaner:test  # Use local test image
-          imagePullPolicy: Never  # Important for local images
+          image: namespace-cleaner:test
+          imagePullPolicy: Never
           command: ["/namespace-cleaner"]
           args: ["--dry-run=$(DRY_RUN)"]
           env:
