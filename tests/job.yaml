@@ -7,18 +7,18 @@ spec:
     spec:
       serviceAccountName: default
       containers:
-      - name: test-container
-        image: namespace-cleaner:test
-        imagePullPolicy: Never
-        command: ["/namespace-cleaner"]
-        args: ["--dry-run=$(DRY_RUN)"]
-        env:
-        - name: DRY_RUN
-          value: "true"
-        - name: TEST_MODE
-          value: "true"
-        envFrom:
-        - configMapRef:
-            name: namespace-cleaner-config
+        - name: test-container
+          image: namespace-cleaner:test
+          imagePullPolicy: Never
+          command: ["/namespace-cleaner"]
+          args: ["--dry-run=$(DRY_RUN)"]
+          env:
+            - name: DRY_RUN
+              value: "true"
+            - name: TEST_MODE
+              value: "true"
+          envFrom:
+            - configMapRef:
+                name: namespace-cleaner-config
       restartPolicy: Never
   backoffLimit: 0
