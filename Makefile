@@ -16,15 +16,19 @@ test-integration: docker-build
 	              -f tests/test-config.yaml \
 	              -f tests/test-cases.yaml \
 	              -f tests/job.yaml
-
+	
 	@echo "Waiting for job completion..."
 	@kubectl wait --for=condition=complete job/namespace-cleaner-test-job --timeout=120s || \
-		(kubectl describe job/namespace-cleaner-test-job; \
-		 kubectl logs job/namespace-cleaner-test-job; \
+		(echo "=== Job failed ==="; \
+		 kubectl describe job/namespace-cleaner-test-job; \
+		 echo "=== Pod logs ==="; \
+		 kubectl logs $$(kubectl get pods -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}'); \
+		 echo "=== Events ==="; \
+		 kubectl get events --sort-by=.metadata.creationTimestamp; \
 		 exit 1)
-
-	@echo "Test logs:"
-	@kubectl logs job/namespace-cleaner-test-job
+	
+	@echo "=== Test logs ==="
+	@kubectl logs $$(kubectl get pods -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}')
 	@make clean-test
 
 # Build Docker image for testing
