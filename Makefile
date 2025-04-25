@@ -12,7 +12,7 @@ test-unit:
 test-integration: docker-build
 	@echo "Running integration tests..."
 	kind load docker-image namespace-cleaner:test
-	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
+	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml manifests/rbac.yaml
 
 	@echo "Starting test pod with debug..."
 	kubectl run testpod \
