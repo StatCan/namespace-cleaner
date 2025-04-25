@@ -13,18 +13,22 @@ test-integration: docker-build
 	@echo "Running integration tests..."
 	kind load docker-image namespace-cleaner:test
 	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml
-	@echo "Starting test pod..."
+
+	@echo "Starting test pod with debug..."
 	kubectl run testpod \
 		--image=namespace-cleaner:test \
 		--restart=Never \
 		--env="DRY_RUN=false" \
 		--env="TEST_MODE=true" \
-		--command -- /namespace-cleaner
-	@echo "Waiting for pod to be ready..."
-	@kubectl wait --for=condition=Ready pod/testpod --timeout=300s
-	@echo "Test logs:"
-	@kubectl logs testpod --tail=-1
-	@make clean-test
+		--command -- sh -c "/namespace-cleaner || sleep 300"  # Keep container alive on failure
+
+	@echo "Waiting for logs..."
+	@sleep 5  # Wait for container to start
+	@kubectl logs -f testpod
+
+	@echo "Pod status:"
+	@kubectl get pod testpod -o wide
+	@make clean-testtest-integration: docker-build
 
 # Build Docker image for testing
 docker-build:
