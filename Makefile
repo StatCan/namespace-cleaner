@@ -12,10 +12,10 @@ test-unit:
 test-integration: docker-build
 	@echo "Running integration tests..."
 	kind load docker-image namespace-cleaner:test
-	kubectl apply -f tests/test-rbac.yaml \
+	kubectl apply -f tests/rbac.yaml \
 	              -f tests/test-config.yaml \
 	              -f tests/test-cases.yaml \
-	              -f tests/test-job.yaml
+	              -f tests/job.yaml
 
 	@echo "Waiting for job completion..."
 	@kubectl wait --for=condition=complete job/namespace-cleaner-test-job --timeout=120s || \
