@@ -12,23 +12,19 @@ test-unit:
 test-integration: docker-build
 	@echo "Running integration tests..."
 	kind load docker-image namespace-cleaner:test
-	kubectl apply -f tests/test-config.yaml -f tests/test-cases.yaml -f tests/rbac.yaml
+	kubectl apply -f tests/test-rbac.yaml \
+	              -f tests/test-config.yaml \
+	              -f tests/test-cases.yaml \
+	              -f tests/test-job.yaml
 
-	@echo "Starting test pod with debug..."
-	kubectl run testpod \
-		--image=namespace-cleaner:test \
-		--restart=Never \
-		--env="DRY_RUN=false" \
-		--env="TEST_MODE=true" \
-		--env-from=configmap/namespace-cleaner-config
-		--command -- sh -c "/namespace-cleaner || sleep 300"  # Keep container alive on failure
+	@echo "Waiting for job completion..."
+	@kubectl wait --for=condition=complete job/namespace-cleaner-test-job --timeout=120s || \
+		(kubectl describe job/namespace-cleaner-test-job; \
+		 kubectl logs job/namespace-cleaner-test-job; \
+		 exit 1)
 
-	@echo "Waiting for logs..."
-	@sleep 5  # Wait for container to start
-	@kubectl logs -f testpod
-
-	@echo "Pod status:"
-	@kubectl get pod testpod -o wide
+	@echo "Test logs:"
+	@kubectl logs job/namespace-cleaner-test-job
 	@make clean-test
 
 # Build Docker image for testing
@@ -74,9 +70,9 @@ clean-test:
 	@echo "\n=== Pre-cleanup state ==="
 	@kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\tLabels: "}{.metadata.labels}{"\tAnnotations: "}{.metadata.annotations}{"\n"}{end}' || true
 	@echo "Cleaning test resources..."
-	@-kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
 	@-kubectl delete pod/testpod --ignore-not-found
-	@-kubectl delete job namespace-cleaner-container-job --ignore-not-found
+	@-kubectl delete job/namespace-cleaner-test-job --ignore-not-found
+	@-kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
 	@echo "\n=== Post-cleanup state ==="
 	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
 
