@@ -5,7 +5,7 @@ metadata:
 spec:
   template:
     spec:
-      serviceAccountName: default
+      serviceAccountName: namespace-cleaner
       containers:
         - name: test-container
           image: namespace-cleaner:test
