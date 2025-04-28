@@ -9,26 +9,31 @@ test-unit:
 	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
 # Integration tests with Kubernetes cluster
-test-integration: docker-build
+test-integration:
 	@echo "Running integration tests..."
+	@echo "Loading test image into kind..."
 	kind load docker-image namespace-cleaner:test
-	kubectl apply -f tests/rbac.yaml \
+
+	@echo "Setting up test namespace and RBAC..."
+	kubectl create namespace das --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n das -f manifests/serviceaccount.yaml \
+	              -f manifests/rbac.yaml \
 	              -f tests/test-config.yaml \
 	              -f tests/test-cases.yaml \
 	              -f tests/job.yaml
-	
+
 	@echo "Waiting for job completion..."
-	@kubectl wait --for=condition=complete job/namespace-cleaner-test-job --timeout=120s || \
+	@kubectl wait -n das --for=condition=complete job/namespace-cleaner-test-job --timeout=120s || \
 		(echo "=== Job failed ==="; \
-		 kubectl describe job/namespace-cleaner-test-job; \
+		 kubectl describe -n das job/namespace-cleaner-test-job; \
 		 echo "=== Pod logs ==="; \
-		 kubectl logs $$(kubectl get pods -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}'); \
+		 kubectl logs -n das $$(kubectl get pods -n das -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}'); \
 		 echo "=== Events ==="; \
-		 kubectl get events --sort-by=.metadata.creationTimestamp; \
+		 kubectl get events -n das --sort-by=.metadata.creationTimestamp; \
 		 exit 1)
-	
+
 	@echo "=== Test logs ==="
-	@kubectl logs $$(kubectl get pods -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}')
+	@kubectl logs -n das $$(kubectl get pods -n das -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}')
 	@make clean-test
 
 # Build Docker image for testing
