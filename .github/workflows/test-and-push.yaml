@@ -19,10 +19,15 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-      - name: Lint YAML files
-        uses: actionshub/yamllint@2
-        with:
-          config_file: .yamllint.yml
+      - name: Lint YAML Files
+        run: |
+          pip install yamllint
+          yamllint .
+
+      - name: Install yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
 
       - name: Set up Go
         uses: actions/setup-go@v4
