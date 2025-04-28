@@ -111,7 +111,7 @@ jobs:
           context: .
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           push: true
-          sbom: true
+          sbom: false
 
       - name: Vulnerability scan
         uses: aquasecurity/trivy-action@0.30.0
