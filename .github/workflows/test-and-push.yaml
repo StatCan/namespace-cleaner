@@ -22,7 +22,7 @@ jobs:
       - name: Lint YAML files
         uses: actionshub/yamllint@2
         with:
-          config_file: .yamllint
+          config_file: .yamllint.yml
 
       - name: Set up Go
         uses: actions/setup-go@v4
