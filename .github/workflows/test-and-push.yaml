@@ -1,3 +1,4 @@
+---
 name: CI Pipeline
 
 on: [push, pull_request]
@@ -106,7 +107,7 @@ jobs:
           sbom: true
 
       - name: Vulnerability scan
-        uses: aquasecurity/trivy-action@0.13
+        uses: aquasecurity/trivy-action@v0.13.0 # Fixed version format
         with:
           image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           severity: "CRITICAL"
