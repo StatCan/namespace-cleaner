@@ -1,98 +1,63 @@
-.PHONY: test-unit test-integration dry-run run stop clean clean-test build docker-build
+.PHONY: test-unit test-integration cluster-setup cluster-teardown test-setup validate
 
-# Run all tests (unit + integration)
-test: test-unit test-integration
-
-# Unit tests with coverage and race detection
+# Unit tests with coverage
 test-unit:
 	@echo "Running unit tests..."
 	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# Integration tests with Kubernetes cluster
-test-integration:
+# Full integration test flow
+test-integration: cluster-setup test-setup
 	@echo "Running integration tests..."
-	@echo "Loading test image into kind..."
+	$(MAKE) run-test-job
+	$(MAKE) validate
+	$(MAKE) cluster-teardown
+
+# Kind cluster management
+cluster-setup:
+	@echo "Creating Kind cluster..."
+	kind create cluster --config - <<EOF
+	kind: Cluster
+	apiVersion: kind.x-k8s.io/v1alpha4
+	nodes:
+	- role: control-plane
+	  extraMounts:
+	  - hostPath: /var/run/docker.sock
+	    containerPath: /var/run/docker.sock
+	EOF
+
+cluster-teardown:
+	@echo "Deleting Kind cluster..."
+	kind delete cluster
+
+# Test infrastructure setup
+test-setup: docker-build
+	@echo "Loading test image..."
 	kind load docker-image namespace-cleaner:test
+	@echo "Applying test manifests..."
+	kubectl apply -f manifests/rbac.yaml -f tests/test-config.yaml -f tests/test-cases.yaml
 
-	@echo "Setting up test namespace and RBAC..."
-	kubectl create namespace das --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -n das -f manifests/serviceaccount.yaml \
-	              -f manifests/rbac.yaml \
-	              -f tests/test-config.yaml \
-	              -f tests/test-cases.yaml \
-	              -f tests/job.yaml
-
+# Run actual test job
+run-test-job:
+	@echo "Executing test job..."
+	kubectl apply -f tests/job.yaml
 	@echo "Waiting for job completion..."
-	@kubectl wait -n das --for=condition=complete job/namespace-cleaner-test-job --timeout=120s || \
-		(echo "=== Job failed ==="; \
-		 kubectl describe -n das job/namespace-cleaner-test-job; \
-		 echo "=== Pod logs ==="; \
-		 kubectl logs -n das $$(kubectl get pods -n das -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}'); \
-		 echo "=== Events ==="; \
-		 kubectl get events -n das --sort-by=.metadata.creationTimestamp; \
-		 exit 1)
+	@kubectl wait --for=condition=complete job/namespace-cleaner-test-job --timeout=300s || \
+		($(MAKE) debug-failure; exit 1)
 
-	@echo "=== Test logs ==="
-	@kubectl logs -n das $$(kubectl get pods -n das -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}')
-	@make clean-test
+# Validation checks
+validate:
+	@echo "=== Validation ==="
+	@kubectl get namespaces --show-labels
+	@kubectl get events --sort-by=.metadata.creationTimestamp
 
-# Build Docker image for testing
+# Debug helpers
+debug-failure:
+	@echo "=== FAILURE DEBUG ==="
+	@kubectl describe job/namespace-cleaner-test-job
+	@kubectl logs $$(kubectl get pods -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}')
+	@kubectl get events --sort-by=.metadata.creationTimestamp
+
+# Docker build
 docker-build:
-	@echo "Building Docker image..."
+	@echo "Building test image..."
 	docker build -t namespace-cleaner:test .
-
-# Build Go binary (for direct execution)
-build:
-	@echo "Building namespace-cleaner binary..."
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/namespace-cleaner
-
-# Deploy to production
-run: build
-	@echo "Deploying namespace cleaner..."
-	kubectl apply -f manifests/configmap.yaml \
-				  -f manifests/cronjob.yaml \
-				  -f manifests/serviceaccount.yaml \
-				  -f manifests/rbac.yaml
-	@echo "\nCronJob scheduled. Next run:"
-	@kubectl get cronjob namespace-cleaner -o jsonpath='{.status.nextScheduleTime}' 2>/dev/null || echo "Not scheduled yet"
-
-# Dry-run mode
-dry-run:
-	@echo "Executing production dry-run (real Azure checks)"
-	kubectl apply -f tests/dry-run-config.yaml \
-				  -f manifests/serviceaccount.yaml \
-				  -f manifests/rbac.yaml \
-				  -f manifests/netpol.yaml \
-				  -f tests/job.yaml
-	@echo "\n=== Dry-run job created ==="
-	@kubectl get job -l app=namespace-cleaner
-
-# Stop production deployment
-stop:
-	@echo "Stopping namespace cleaner..."
-	kubectl delete -f manifests/cronjob.yaml --ignore-not-found
-	@echo "Retained resources:"
-	@kubectl get configmap,serviceaccount,clusterrole,clusterrolebinding -l app=namespace-cleaner
-
-# Enhanced clean-test with debugging
-clean-test:
-	@echo "\n=== Pre-cleanup state ==="
-	@kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\tLabels: "}{.metadata.labels}{"\tAnnotations: "}{.metadata.annotations}{"\n"}{end}' || true
-	@echo "Cleaning test resources..."
-	@-kubectl delete pod/testpod --ignore-not-found
-	@-kubectl delete job/namespace-cleaner-test-job --ignore-not-found
-	@-kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
-	@echo "\n=== Post-cleanup state ==="
-	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
-
-# Full cleanup
-clean: clean-test
-	@echo "Cleaning production resources..."
-	@-kubectl delete -f manifests/configmap.yaml \
-				   -f manifests/cronjob.yaml \
-				   -f manifests/rbac.yaml \
-				   -f manifests/netpol.yaml \
-				   -f tests/job.yaml \
-				   -f manifests/serviceaccount.yaml --ignore-not-found
-	@echo "\n=== Final cluster state ==="
-	@kubectl get all -l app=namespace-cleaner

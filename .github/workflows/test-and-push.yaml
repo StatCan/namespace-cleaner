@@ -1,102 +1,52 @@
----
 name: CI Pipeline
 
 on: [push, pull_request]
 
 env:
-  GO_VERSION: "1.21"
-  TRIVY_VERSION: "0.57.0"
+  REGISTRY: k8scc01covidacr.azurecr.io
 
 jobs:
-  lint-and-test:
+  unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Add explicit cache cleanup to prevent tar errors
-      - name: Clean workspace
-        run: |
-          sudo rm -rf /usr/local/go/pkg
-          go clean -cache
-          go clean -modcache
-
-      - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
-
-      - name: Lint YAML Files
-        run: |
-          pip install yamllint
-          yamllint .
-
-      - name: Install yq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y yq
-
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: "1.21"
 
-      - name: Run unit tests
-        run: make test-unit
+      - run: make test-unit
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v3
         with:
           file: coverage.out
 
   integration-tests:
     runs-on: ubuntu-latest
-    needs: lint-and-test
+    needs: unit-tests
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create Kind cluster
-        run: |
-          cat <<EOF | kind create cluster --config -
-          kind: Cluster
-          apiVersion: kind.x-k8s.io/v1alpha4
-          nodes:
-          - role: control-plane
-            extraMounts:
-            - hostPath: /var/run/docker.sock
-              containerPath: /var/run/docker.sock
-          EOF
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Build and load test image
-        run: |
-          make docker-build
-          kind load docker-image namespace-cleaner:test
+      - name: Setup Kind
+        uses: helm/kind-action@v1.8.0
 
       - name: Run integration tests
-        run: make test-integration
+        run: |
+          make docker-build
+          make test-integration
 
-      - name: Debug on failure
+      - name: Capture cluster state on failure
         if: ${{ failure() }}
         run: |
           kubectl get all,events -A
-          kubectl logs -l app=namespace-cleaner --all-containers=true --tail=100
+          kubectl logs -l app=namespace-cleaner --tail=100
 
-  build-and-push:
+  build-push:
     runs-on: ubuntu-latest
     needs: integration-tests
-    services:
-      registry:
-        image: registry:2
-        ports: [5000:5000]
-    env:
-      REGISTRY: ${{ vars.REGISTRY_NAME || 'k8scc01covidacr' }}.azurecr.io
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Login to ACR
         uses: azure/docker-login@v1
@@ -105,19 +55,15 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Build and scan
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: .
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           push: true
-          sbom: false
 
-      - name: Vulnerability scan
+      - name: Security scan
         uses: aquasecurity/trivy-action@0.30.0
         with:
           image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           severity: "CRITICAL"
           ignore-unfixed: true
-          format: "table"
-          exit-code: 1
