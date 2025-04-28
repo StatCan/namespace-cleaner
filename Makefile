@@ -15,15 +15,7 @@ test-integration: cluster-setup test-setup
 # Kind cluster management
 cluster-setup:
 	@echo "Creating Kind cluster..."
-	kind create cluster --config - <<EOF
-	kind: Cluster
-	apiVersion: kind.x-k8s.io/v1alpha4
-	nodes:
-	- role: control-plane
-	  extraMounts:
-	  - hostPath: /var/run/docker.sock
-	    containerPath: /var/run/docker.sock
-	EOF
+	@echo 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n- role: control-plane\n  extraMounts:\n  - hostPath: /var/run/docker.sock\n    containerPath: /var/run/docker.sock' | kind create cluster --config -
 
 cluster-teardown:
 	@echo "Deleting Kind cluster..."
