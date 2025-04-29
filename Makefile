@@ -39,9 +39,9 @@ cluster-teardown:
 # Run actual test job
 run-test-job:
 	@echo "Executing test job..."
-	kubectl apply -f tests/job.yaml
+	@kubectl apply -n das -f tests/job.yaml
 	@echo "Waiting for job completion..."
-	@kubectl wait --for=condition=complete job/namespace-cleaner-test-job --timeout=300s || \
+	@kubectl wait -n das --for=condition=complete job/namespace-cleaner-test-job --timeout=300s || \
 		($(MAKE) debug-failure; exit 1)
 
 # Validation checks
