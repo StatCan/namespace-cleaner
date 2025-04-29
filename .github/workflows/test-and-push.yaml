@@ -67,3 +67,4 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           severity: "CRITICAL"
           ignore-unfixed: true
+          exit-code: 1
