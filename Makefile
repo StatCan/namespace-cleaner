@@ -47,8 +47,15 @@ run-test-job:
 # Validation checks
 validate:
 	@echo "=== Validation ==="
-	@kubectl get namespaces --show-labels
-	@kubectl get events --sort-by=.metadata.creationTimestamp
+	@echo "Checking test namespace status..."
+	@kubectl get ns test-expired-ns --ignore-not-found -o jsonpath='{.status.phase}' | grep -q NotFound || (echo "Expired namespace not cleaned up"; exit 1)
+	@kubectl get ns test-valid-user -o jsonpath='{.status.phase}' | grep -q Active || (echo "Valid namespace missing"; exit 1)
+	@echo "=== Namespace List ==="
+	@kubectl get ns --show-labels
+	@echo "=== Events ==="
+	@kubectl get events -n das --sort-by=.metadata.creationTimestamp
+	@echo "=== Resource Cleanup Check ==="
+	@test -z "$(kubectl get jobs -n das -o name)" || (echo "Orphaned jobs exist"; exit 1)
 
 # Debug on failure
 debug-failure:
