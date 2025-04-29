@@ -19,7 +19,7 @@ spec:
             name: namespace-cleaner-config
         env:
         - name: DRY_RUN
-          value: "true"
+          value: "false"
         - name: TEST_MODE
           value: "true"
       restartPolicy: Never
