@@ -3,7 +3,7 @@ package main
 import (
     "context"
     "fmt"
-    "io/ioutil"
+    "io"
     "log"
     "strings"
     "testing"
@@ -44,7 +44,7 @@ func (s *NamespaceCleanerTestSuite) SetupTest() {
         DryRun:         false,
         GracePeriod:    7,
     }
-    log.SetOutput(ioutil.Discard) // Silence logs
+    log.SetOutput(io.Discard) // Silence logs
 }
 
 // Helper for printing diffs in failed tests
@@ -75,7 +75,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
     now := time.Now().UTC()
 
     // Helper to format time in label format
-    formatLabelTime(t := func(t time.Time) string {
+    formatLabelTime := func(t time.Time) string {
         return t.UTC().Format(labelTimeLayout)
     }
 
