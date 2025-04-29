@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: namespace-cleaner-test-job
+  namespace: das 
 spec:
   template:
     spec:

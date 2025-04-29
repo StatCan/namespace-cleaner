@@ -39,8 +39,8 @@ jobs:
       - name: Capture cluster state on failure
         if: ${{ failure() }}
         run: |
-          kubectl get all,events -A
-          kubectl logs -l app=namespace-cleaner --tail=100
+          kubectl get all,events -n das
+          kubectl describe clusterrolebinding/namespace-cleaner-bind
 
   build-push:
     runs-on: ubuntu-latest

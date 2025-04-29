@@ -1,5 +1,7 @@
 .PHONY: test-unit test-integration cluster-setup cluster-teardown test-setup validate
 
+CLUSTER_CONFIG := kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n- role: control-plane\n  extraMounts:\n  - hostPath: /var/run/docker.sock\n    containerPath: /var/run/docker.sock
+
 # Unit tests with coverage
 test-unit:
 	@echo "Running unit tests..."
@@ -15,18 +17,24 @@ test-integration: cluster-setup test-setup
 # Kind cluster management
 cluster-setup:
 	@echo "Creating Kind cluster..."
-	@echo 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n- role: control-plane\n  extraMounts:\n  - hostPath: /var/run/docker.sock\n    containerPath: /var/run/docker.sock' | kind create cluster --config -
-
-cluster-teardown:
-	@echo "Deleting Kind cluster..."
-	kind delete cluster
+	@printf '$(CLUSTER_CONFIG)' | kind create cluster --config -
+	@echo "Creating test namespace..."
+	@kubectl create namespace das
 
 # Test infrastructure setup
 test-setup: docker-build
 	@echo "Loading test image..."
-	kind load docker-image namespace-cleaner:test
+	@kind load docker-image namespace-cleaner:test
 	@echo "Applying test manifests..."
-	kubectl apply -f manifests/rbac.yaml -f tests/test-config.yaml -f tests/test-cases.yaml
+	@kubectl apply -n das -f manifests/serviceaccount.yaml \
+		-f manifests/rbac.yaml \
+		-f tests/test-config.yaml \
+		-f tests/test-cases.yaml
+
+# Delete cluster
+cluster-teardown:
+	@echo "Deleting Kind cluster..."
+	kind delete cluster
 
 # Run actual test job
 run-test-job:
@@ -42,12 +50,16 @@ validate:
 	@kubectl get namespaces --show-labels
 	@kubectl get events --sort-by=.metadata.creationTimestamp
 
-# Debug helpers
+# Debug on failure
 debug-failure:
 	@echo "=== FAILURE DEBUG ==="
-	@kubectl describe job/namespace-cleaner-test-job
-	@kubectl logs $$(kubectl get pods -l job-name=namespace-cleaner-test-job -o jsonpath='{.items[0].metadata.name}')
-	@kubectl get events --sort-by=.metadata.creationTimestamp
+	@kubectl describe job/namespace-cleaner-test-job -n das
+	@echo "=== SERVICE ACCOUNT ==="
+	@kubectl get serviceaccount/namespace-cleaner -n das -o yaml
+	@echo "=== POD LOGS ==="
+	@kubectl logs -n das -l job-name=namespace-cleaner-test-job --tail=100 || echo "No pods found"
+	@echo "=== EVENTS ==="
+	@kubectl get events -n das --sort-by=.metadata.creationTimestamp
 
 # Docker build
 docker-build:
