@@ -46,16 +46,41 @@ run-test-job:
 
 # Validation checks
 validate:
-	@echo "=== Validation ==="
-	@echo "Checking test namespace status..."
-	@kubectl get ns test-expired-ns --ignore-not-found -o jsonpath='{.status.phase}' | grep -q NotFound || (echo "Expired namespace not cleaned up"; exit 1)
-	@kubectl get ns test-valid-user -o jsonpath='{.status.phase}' | grep -q Active || (echo "Valid namespace missing"; exit 1)
-	@echo "=== Namespace List ==="
-	@kubectl get ns --show-labels
-	@echo "=== Events ==="
-	@kubectl get events -n das --sort-by=.metadata.creationTimestamp
-	@echo "=== Resource Cleanup Check ==="
-	@test -z "$(kubectl get jobs -n das -o name)" || (echo "Orphaned jobs exist"; exit 1)
+	@echo "=== VALIDATION PHASE ==="
+	
+	# Check expected namespace cleanup
+	@echo "1/3 Checking expired namespaces were cleaned..."
+	@if kubectl get ns test-expired-ns test-invalid-user --ignore-not-found 2>/dev/null | grep -q .; then \
+		echo "ERROR: Expired namespaces still exist:"; \
+		kubectl get ns test-expired-ns test-invalid-user --show-labels; \
+		exit 1; \
+	else \
+		echo "✓ Cleanup verified - no expired namespaces present"; \
+	fi
+
+	# Verify valid namespace remains
+	@echo "2/3 Checking valid namespace persists..."
+	@if ! kubectl get ns test-valid-user -o jsonpath='{.status.phase}' | grep -q Active; then \
+		echo "ERROR: Valid namespace 'test-valid-user' missing or inactive"; \
+		exit 1; \
+	else \
+		echo "✓ Valid namespace present and active"; \
+	fi
+
+	# Verify job cleanup
+	@echo "3/3 Checking for orphaned resources..."
+	@if [ -n "$$(kubectl get jobs -n das -o name)" ]; then \
+		echo "ERROR: Orphaned jobs detected:"; \
+		kubectl get jobs -n das; \
+		exit 1; \
+	else \
+		echo "✓ No orphaned resources found"; \
+	fi
+
+	@echo "\n=== FINAL CLUSTER STATE ==="
+	@kubectl get ns --show-labels | grep -E 'NAME|test-'
+	@echo "\n=== RECENT EVENTS ==="
+	@kubectl get events -n das --sort-by=.metadata.creationTimestamp --field-selector=type!=Normal
 
 # Debug on failure
 debug-failure:
