@@ -28,6 +28,10 @@ type Config struct {
 	GracePeriod    int
 }
 
+const (
+    labelTimeLayout = "2006-01-02_15-04-05Z"
+)
+
 func main() {
 	cfg := Config{
 		ClientID:       os.Getenv("CLIENT_ID"),
@@ -140,7 +144,8 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	if err != nil {
 		log.Fatalf("Error listing namespaces: %v", err)
 	}
-	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).Format("2006-01-02")
+
+	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).UTC().Format(labelTimeLayout)
 
 	for _, ns := range nsList.Items {
 		email := ns.Annotations["owner"]
@@ -153,8 +158,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Would label %s with delete-at=%s", ns.Name, graceDate)
 			} else {
-				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))
-				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 				if err != nil {
 					log.Printf("Error patching %s: %v", ns.Name, err)
 				}
@@ -172,8 +176,18 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	today := time.Now()
 
 	for _, ns := range expired.Items {
-		label := ns.Labels["namespace-cleaner/delete-at"]
-		deletionDate, _ := time.Parse("2006-01-02", label)
+		labelValue := ns.Labels["namespace-cleaner/delete-at"]
+		
+		// Replace underscores to restore RFC3339 format
+		labelValue = strings.Replace(labelValue, "_", "T", 1)
+		labelValue = strings.Replace(labelValue, "_", ":", -1)
+		
+		deletionDate, err := time.Parse(time.RFC3339, labelValue)
+		if err != nil {
+			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
+			continue
+		}
+
 		email := ns.Annotations["owner"]
 
 		// Check if user exists FIRST
