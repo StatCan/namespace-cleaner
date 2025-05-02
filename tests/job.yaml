@@ -9,18 +9,30 @@ spec:
     spec:
       serviceAccountName: namespace-cleaner
       containers:
-      - name: test-container
-        image: namespace-cleaner:test
-        imagePullPolicy: Never
-        command: ["/namespace-cleaner"]
-        args: ["--dry-run=$(DRY_RUN)"]
-        envFrom:
-        - configMapRef:
-            name: namespace-cleaner-config
-        env:
-        - name: DRY_RUN
-          value: "false"
-        - name: TEST_MODE
-          value: "true"
+        - name: test-container
+          image: namespace-cleaner:test
+          imagePullPolicy: Never
+          command: ["/namespace-cleaner"]
+          args: ["--dry-run=$(DRY_RUN)"]
+          envFrom:
+            - configMapRef:
+                name: namespace-cleaner-config
+          env:
+            - name: DRY_RUN
+              value: "false"
+            - name: TEST_MODE
+              value: "true"
       restartPolicy: Never
+      tolerations:
+        # allow scheduling on the control-plane node
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        # allow scheduling even if the node is temporarily NotReady
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoSchedule
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
   backoffLimit: 0
