@@ -206,11 +206,8 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		}
 
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
-		// restore RFC3339: first _ to T, rest _ to :
-		labelValue = strings.Replace(labelValue, "_", "T", 1)
-		labelValue = strings.Replace(labelValue, "_", ":", -1)
+		deletionDate, err := time.Parse(labelTimeLayout, labelValue)
 
-		deletionDate, err := time.Parse(time.RFC3339, labelValue)
 		if err != nil {
 			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
 			continue
