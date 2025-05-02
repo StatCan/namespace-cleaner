@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// Config holds configuration for namespace-cleaner
 type Config struct {
 	ClientID       string
 	ClientSecret   string
@@ -29,7 +30,8 @@ type Config struct {
 }
 
 const (
-    labelTimeLayout = "2006-01-02_15-04-05Z"
+	// labelTimeLayout is the format used for delete-at labels
+	labelTimeLayout = "2006-01-02_15-04-05Z"
 )
 
 func main() {
@@ -51,6 +53,7 @@ func main() {
 	processNamespaces(ctx, graphClient, kubeClient, cfg)
 }
 
+// getGracePeriod reads GRACE_PERIOD env or defaults to 30 days
 func getGracePeriod() int {
 	val := os.Getenv("GRACE_PERIOD")
 	if val == "" {
@@ -61,6 +64,7 @@ func getGracePeriod() int {
 	return days
 }
 
+// initGraphClient initializes Microsoft Graph client (or mock in test mode)
 func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceClient {
 	if cfg.TestMode {
 		// Return mock client for tests
@@ -78,13 +82,17 @@ func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceCl
 		log.Fatalf("Graph auth failed: %v", err)
 	}
 
-	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(cred, []string{"https://graph.microsoft.com/.default"})
+	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(
+		cred,
+		[]string{"https://graph.microsoft.com/.default"},
+	)
 	if err != nil {
 		log.Fatalf("Graph client creation failed: %v", err)
 	}
 	return client
 }
 
+// initKubeClient initializes Kubernetes in-cluster client
 func initKubeClient() *kubernetes.Clientset {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
@@ -97,6 +105,7 @@ func initKubeClient() *kubernetes.Clientset {
 	return clientset
 }
 
+// userExists checks if a user exists in Graph (or test list)
 func userExists(ctx context.Context, cfg Config, client *msgraphsdk.GraphServiceClient, email string) bool {
 	if cfg.TestMode {
 		for _, u := range cfg.TestUsers {
@@ -122,6 +131,7 @@ func userExists(ctx context.Context, cfg Config, client *msgraphsdk.GraphService
 	return true
 }
 
+// validDomain ensures email's domain is in allowed list
 func validDomain(email string, domains []string) bool {
 	parts := strings.Split(email, "@")
 	if len(parts) != 2 {
@@ -136,8 +146,9 @@ func validDomain(email string, domains []string) bool {
 	return false
 }
 
+// processNamespaces labels or deletes namespaces based on owner existence and delete-at
 func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient, kube kubernetes.Interface, cfg Config) {
-	// Process namespaces without delete-at label
+	// 1) Add delete-at label to namespaces missing it
 	nsList, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/part-of=kubeflow-profile,!namespace-cleaner/delete-at",
 	})
@@ -145,7 +156,9 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		log.Fatalf("Error listing namespaces: %v", err)
 	}
 
-	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).UTC().Format(labelTimeLayout)
+	// compute grace date
+	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).
+		UTC().Format(labelTimeLayout)
 
 	for _, ns := range nsList.Items {
 		email := ns.Annotations["owner"]
@@ -158,8 +171,16 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Would label %s with delete-at=%s", ns.Name, graceDate)
 			} else {
-				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate)),
-				 err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+				patch := []byte(fmt.Sprintf(
+					`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate,
+				))
+				_, err := kube.CoreV1().Namespaces().Patch(
+					ctx,
+					ns.Name,
+					types.MergePatchType,
+					patch,
+					metav1.PatchOptions{},
+				)
 				if err != nil {
 					log.Printf("Error patching %s: %v", ns.Name, err)
 				}
@@ -167,7 +188,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		}
 	}
 
-	// Process namespaces with delete-at label
+	// 2) Remove label or delete expired namespaces
 	expired, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "namespace-cleaner/delete-at",
 	})
@@ -178,11 +199,10 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 
 	for _, ns := range expired.Items {
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
-		
-		// Replace underscores to restore RFC3339 format
+		// restore RFC3339: first _ to T, rest _ to :
 		labelValue = strings.Replace(labelValue, "_", "T", 1)
 		labelValue = strings.Replace(labelValue, "_", ":", -1)
-		
+
 		deletionDate, err := time.Parse(time.RFC3339, labelValue)
 		if err != nil {
 			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
@@ -191,7 +211,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 
 		email := ns.Annotations["owner"]
 
-		// Check if user exists FIRST
+		// if user reappeared, remove label
 		if userExists(ctx, cfg, graph, email) {
 			log.Printf("User restored, removing delete-at from %s", ns.Name)
 			if cfg.DryRun {
@@ -204,7 +224,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				}
 			}
 		} else if today.After(deletionDate) {
-			// Only delete if user doesn't exist AND date has passed
+			// if still missing and past date, delete namespace
 			log.Printf("Deleting namespace: %s", ns.Name)
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Would delete %s", ns.Name)
