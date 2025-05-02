@@ -174,7 +174,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				patch := []byte(fmt.Sprintf(
 					`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate,
 				))
-				_, err := kube.CoreV1().Namespaces().Patch(
+				_, err = kube.CoreV1().Namespaces().Patch(
 					ctx,
 					ns.Name,
 					types.MergePatchType,
@@ -198,6 +198,13 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	today := time.Now()
 
 	for _, ns := range expired.Items {
+		email := ns.Annotations["owner"]
+		// skip invalid domains entirely
+		if !validDomain(email, cfg.AllowedDomains) {
+			log.Printf("Skipping invalid domain for expired ns %s", ns.Name)
+			continue
+		}
+
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
 		// restore RFC3339: first _ to T, rest _ to :
 		labelValue = strings.Replace(labelValue, "_", "T", 1)
@@ -208,8 +215,6 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
 			continue
 		}
-
-		email := ns.Annotations["owner"]
 
 		// if user reappeared, remove label
 		if userExists(ctx, cfg, graph, email) {
