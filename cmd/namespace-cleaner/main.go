@@ -199,15 +199,10 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 
 	for _, ns := range expired.Items {
 		email := ns.Annotations["owner"]
-		// skip invalid domains entirely
-		if !validDomain(email, cfg.AllowedDomains) {
-			log.Printf("Skipping invalid domain for expired ns %s", ns.Name)
-			continue
-		}
 
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
+		// parse using custom layout directly
 		deletionDate, err := time.Parse(labelTimeLayout, labelValue)
-
 		if err != nil {
 			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
 			continue
