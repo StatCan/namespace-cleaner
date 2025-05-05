@@ -38,11 +38,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
-          buildkitd-flags: --debug
-          buildx-version: latest
-          install: true
           use: true
+          install: true
           name: ci-builder
+          bootstrap: true
 
       - name: Login to ACR
         uses: azure/docker-login@v1
