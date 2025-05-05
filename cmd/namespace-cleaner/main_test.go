@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"log"
-	"net/http"
-	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/jarcoal/httpmock"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -298,24 +295,26 @@ func TestUserExists_TestMode(t *testing.T) {
 	}
 }
 
-// Test userExists in non-test mode
+// Test userExists in non-test mode using HTTP mocking
 func TestUserExists_NonTestMode(t *testing.T) {
-	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/users/test@example.com") {
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"id": "123"})
-		} else if strings.Contains(r.URL.Path, "/users/notfound@example.com") {
-			w.WriteHeader(http.StatusNotFound)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	}))
-	defer server.Close()
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
 
-	// Create mock graph client
-	graphClient := msgraphsdk.NewGraphServiceClient(&mockRequestAdapter{
-		BaseUrl: server.URL,
+	// Mock successful user response
+	httpmock.RegisterResponder("GET", "/users/test@example.com",
+		httpmock.NewStringResponder(200, `{"id": "123"}`))
+
+	// Mock user not found response
+	httpmock.RegisterResponder("GET", "/users/notfound@example.com",
+		httpmock.NewStringResponder(404, `{"error": {"code": "NotFound"}}`))
+
+	// Mock error response
+	httpmock.RegisterResponder("GET", "/users/error@example.com",
+		httpmock.NewStringResponder(500, `{"error": {"code": "InternalServerError"}}`))
+
+	// Create Graph client with real HTTP transport
+	graphClient := msgraphsdk.NewGraphServiceClient(&msgraphsdk.MockRequestAdapter{
+		BaseUrl: "https://graph.microsoft.com/v1.0",
 	})
 
 	tests := []struct {
@@ -336,34 +335,6 @@ func TestUserExists_NonTestMode(t *testing.T) {
 			assert.Equal(t, tt.want, userExists(context.Background(), cfg, graphClient, tt.email))
 		})
 	}
-}
-
-type mockRequestAdapter struct {
-	BaseUrl string
-}
-
-func (m *mockRequestAdapter) ConvertToNativeRequest() (*http.Request, error) {
-	return http.NewRequest("GET", m.BaseUrl, nil)
-}
-
-func (m *mockRequestAdapter) Send(
-	ctx context.Context,
-	request *http.Request,
-	response interface{},
-	errorMapping map[string]func(error) error,
-) error {
-	// Simulate successful response
-	resp, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	return json.NewDecoder(resp.Body).Decode(response)
-}
-
-func (m *mockRequestAdapter) GetBaseURL() string {
-	return m.BaseUrl
 }
 
 // Test Kubernetes client initialization
