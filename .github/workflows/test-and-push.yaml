@@ -54,7 +54,7 @@ jobs:
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          builder: ${{ steps.buildx.outputs.name }}
+          builder: ci-builder
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           push: true
           cache-from: type=gha
