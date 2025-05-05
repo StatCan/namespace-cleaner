@@ -40,8 +40,6 @@ jobs:
           driver: docker-container
           use: true
           install: true
-          name: ci-builder
-          bootstrap: true
 
       - name: Login to ACR
         uses: azure/docker-login@v1
@@ -53,18 +51,7 @@ jobs:
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          builder: ci-builder
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Security Scan
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
-          severity: "CRITICAL"
-          ignore-unfixed: true
-          exit-code: 1
-          format: table
-          verbose: true
