@@ -23,16 +23,4 @@ spec:
             - name: TEST_MODE
               value: "true"
       restartPolicy: Never
-      tolerations:
-        # allow scheduling on the control-plane node
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
-        # allow scheduling even if the node is temporarily NotReady
-        - key: node.kubernetes.io/not-ready
-          operator: Exists
-          effect: NoSchedule
-        - key: node.kubernetes.io/unreachable
-          operator: Exists
-          effect: NoExecute
   backoffLimit: 0
