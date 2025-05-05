@@ -2,35 +2,49 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
+	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// Test Suite Struct
 type NamespaceCleanerTestSuite struct {
 	suite.Suite
 	client    *fake.Clientset
 	ctx       context.Context
 	config    Config
-	graceDate string // Used in test setup
+	graceDate string
 }
 
+// Constants for test fixtures
+const (
+	testNamespace   = "test-namespace"
+	labelTimeLayout = "2006-01-02_15-04-05Z"
+)
+
+// Setup test environment
 func (s *NamespaceCleanerTestSuite) SetupTest() {
 	s.ctx = context.Background()
 	now := time.Now().UTC()
 
-	// Set grace date ~7 days ahead in UTC
 	s.graceDate = now.AddDate(0, 0, 7).Format(labelTimeLayout)
 
-	// Default config for tests
 	s.config = Config{
 		TestMode:       true,
 		TestUsers:      []string{"test@example.com"},
@@ -38,10 +52,11 @@ func (s *NamespaceCleanerTestSuite) SetupTest() {
 		DryRun:         false,
 		GracePeriod:    7,
 	}
-	log.SetOutput(io.Discard) // Silence logs
+	log.SetOutput(io.Discard)
 }
 
-func (s *NamespaceCleanerTestSuite) logNamespaceDiff(initial, final *corev1.Namespace) {
+// Helper to compare namespace state
+func (s *NamespaceCleanerTestSuite) logNamespaceDiff(initial, final *v1.Namespace) {
 	if !s.T().Failed() {
 		return
 	}
@@ -78,6 +93,7 @@ func (s *NamespaceCleanerTestSuite) logNamespaceDiff(initial, final *corev1.Name
 	}
 }
 
+// Test cases for processNamespaces
 func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 	testCases := []struct {
 		name            string
@@ -86,22 +102,98 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 		expectedDeletes int
 		dryRun          bool
 	}{
-		// Your test cases here...
+		{
+			name: "Namespace with invalid owner domain",
+			namespaces: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-owner",
+						Annotations: map[string]string{
+							"owner": "user@bad-domain.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 0,
+			expectedDeletes: 0,
+		},
+		{
+			name: "Valid owner with existing user",
+			namespaces: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "valid-owner",
+						Annotations: map[string]string{
+							"owner": "test@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 0,
+			expectedDeletes: 0,
+		},
+		{
+			name: "Valid owner with non-existent user",
+			namespaces: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-user",
+						Annotations: map[string]string{
+							"owner": "notfound@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 1, // Add delete-at label
+			expectedDeletes: 0,
+		},
+		{
+			name: "Expired namespace with delete-at label",
+			namespaces: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "expired-namespace",
+						Labels: map[string]string{
+							"namespace-cleaner/delete-at": time.Now().AddDate(0, 0, -1).Format(labelTimeLayout),
+						},
+						Annotations: map[string]string{
+							"owner": "notfound@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 0,
+			expectedDeletes: 1, // Namespace should be deleted
+		},
+		{
+			name: "Namespace without delete-at label",
+			namespaces: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "no-delete-label",
+						Annotations: map[string]string{
+							"owner": "notfound@example.com",
+						},
+					},
+				},
+			},
+			expectedPatches: 1, // Add delete-at label
+			expectedDeletes: 0,
+		},
 	}
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			// Initialize fake client with test objects
 			s.client = fake.NewSimpleClientset(tc.namespaces...)
 			originalConfig := s.config
-			defer func() { s.config = originalConfig }() // Reset config after test
+			defer func() { s.config = originalConfig }()
 
 			if tc.dryRun {
 				s.config.DryRun = true
 			}
 
 			// Capture initial state
-			initialNamespaces := make(map[string]*corev1.Namespace)
+			initialNamespaces := make(map[string]*v1.Namespace)
 			nsList, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
 			for _, ns := range nsList.Items {
 				initialNamespaces[ns.Name] = ns.DeepCopy()
@@ -111,7 +203,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			processNamespaces(s.ctx, nil, s.client, s.config)
 
 			// Capture final state
-			finalNamespaces := make(map[string]*corev1.Namespace)
+			finalNamespaces := make(map[string]*v1.Namespace)
 			nsList, _ = s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
 			for _, ns := range nsList.Items {
 				finalNamespaces[ns.Name] = ns.DeepCopy()
@@ -144,6 +236,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 	}
 }
 
+// Test getGracePeriod with various inputs
 func TestGetGracePeriod(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -153,6 +246,9 @@ func TestGetGracePeriod(t *testing.T) {
 		{"Default", "", 30},
 		{"Valid", "7", 7},
 		{"Invalid", "abc", 0},
+		{"Negative", "-5", 0},
+		{"Zero", "0", 0},
+		{"Whitespace", " 15 ", 15},
 	}
 
 	for _, tt := range tests {
@@ -163,6 +259,7 @@ func TestGetGracePeriod(t *testing.T) {
 	}
 }
 
+// Test validDomain with various scenarios
 func TestValidDomain(t *testing.T) {
 	tests := []struct {
 		email   string
@@ -173,6 +270,9 @@ func TestValidDomain(t *testing.T) {
 		{"user@notallowed.com", []string{"allowed.com"}, false},
 		{"invalid-email", []string{"allowed.com"}, false},
 		{"user@allowed.co.uk", []string{"allowed.com", "allowed.co.uk"}, true},
+		{"user@sub.allowed.com", []string{"allowed.com"}, true},
+		{"user@", []string{"allowed.com"}, false},
+		{"", []string{"allowed.com"}, false},
 	}
 
 	for _, tt := range tests {
@@ -182,6 +282,7 @@ func TestValidDomain(t *testing.T) {
 	}
 }
 
+// Test userExists in test mode
 func TestUserExists_TestMode(t *testing.T) {
 	cfg := Config{
 		TestMode:  true,
@@ -194,6 +295,7 @@ func TestUserExists_TestMode(t *testing.T) {
 	}{
 		{"test@example.com", true},
 		{"notfound@example.com", false},
+		{"invalid-email", false},
 	}
 
 	for _, tt := range tests {
@@ -201,4 +303,185 @@ func TestUserExists_TestMode(t *testing.T) {
 			assert.Equal(t, tt.want, userExists(context.Background(), cfg, nil, tt.email))
 		})
 	}
+}
+
+// Test userExists in non-test mode
+func TestUserExists_NonTestMode(t *testing.T) {
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/users/test@example.com") {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"id": "123"})
+		} else if strings.Contains(r.URL.Path, "/users/notfound@example.com") {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	// Create mock graph client
+	graphClient := msgraphsdk.NewGraphServiceClient(&mockRequestAdapter{
+		BaseUrl: server.URL,
+	})
+
+	tests := []struct {
+		email string
+		want  bool
+	}{
+		{"test@example.com", true},
+		{"notfound@example.com", false},
+		{"error@example.com", false},
+	}
+
+	cfg := Config{
+		TestMode: false,
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.email, func(t *testing.T) {
+			assert.Equal(t, tt.want, userExists(context.Background(), cfg, graphClient, tt.email))
+		})
+	}
+}
+
+// Mock request adapter for MS Graph
+type mockRequestAdapter struct {
+	BaseUrl string
+}
+
+func (m *mockRequestAdapter) GetBaseURL() string {
+	return m.BaseUrl
+}
+
+func (m *mockRequestAdapter) Send(ctx context.Context, request *http.Request, response interface{}, errorMapping map[string]func(error) error) error {
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return errors.New("http error")
+	}
+
+	return json.NewDecoder(resp.Body).Decode(response)
+}
+
+// Test Kubernetes client initialization
+func TestInitKubeClient(t *testing.T) {
+	// Test normal case
+	client := initKubeClient()
+	assert.NotNil(t, client)
+
+	// Test error case
+	oldKubeconfig := os.Getenv("KUBECONFIG")
+	defer os.Setenv("KUBECONFIG", oldKubeconfig)
+
+	os.Setenv("KUBECONFIG", "/nonexistent/file")
+	assert.Panics(t, func() {
+		initKubeClient()
+	})
+}
+
+// Test namespace labeling logic
+func TestNamespaceLabeling(t *testing.T) {
+	now := time.Now().UTC()
+	graceDate := now.AddDate(0, 0, 7).Format(labelTimeLayout)
+
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+			Annotations: map[string]string{
+				"owner": "notfound@example.com",
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(ns)
+	cfg := Config{
+		TestMode:       true,
+		TestUsers:      []string{"test@example.com"},
+		AllowedDomains: []string{"example.com"},
+		GracePeriod:    7,
+	}
+
+	// Test label addition
+	processNamespaces(context.Background(), nil, client, cfg)
+
+	updatedNs, err := client.CoreV1().Namespaces().Get(context.Background(), "test", metav1.GetOptions{})
+	require.NoError(t, err)
+
+	assert.Contains(t, updatedNs.Labels, "namespace-cleaner/delete-at")
+	assert.NotEmpty(t, updatedNs.Labels["namespace-cleaner/delete-at"])
+
+	// Test label removal
+	cfg.TestUsers = []string{"notfound@example.com"}
+	processNamespaces(context.Background(), nil, client, cfg)
+
+	updatedNs, err = client.CoreV1().Namespaces().Get(context.Background(), "test", metav1.GetOptions{})
+	require.NoError(t, err)
+
+	assert.NotContains(t, updatedNs.Labels, "namespace-cleaner/delete-at")
+}
+
+// Test dry run behavior
+func TestDryRunMode(t *testing.T) {
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+			Annotations: map[string]string{
+				"owner": "notfound@example.com",
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(ns)
+	cfg := Config{
+		TestMode:       true,
+		TestUsers:      []string{"test@example.com"},
+		AllowedDomains: []string{"example.com"},
+		DryRun:         true,
+		GracePeriod:    7,
+	}
+
+	// Run in dry run mode
+	processNamespaces(context.Background(), nil, client, cfg)
+
+	// Namespace should not be modified
+	updatedNs, err := client.CoreV1().Namespaces().Get(context.Background(), "test", metav1.GetOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, ns, updatedNs)
+}
+
+// Test label parsing errors
+func TestLabelParsingErrors(t *testing.T) {
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "invalid-label",
+			Labels: map[string]string{
+				"namespace-cleaner/delete-at": "invalid-date-format",
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset(ns)
+	cfg := Config{
+		TestMode:       true,
+		TestUsers:      []string{"notfound@example.com"},
+		AllowedDomains: []string{"example.com"},
+		GracePeriod:    7,
+	}
+
+	// Should handle invalid date format
+	processNamespaces(context.Background(), nil, client, cfg)
+
+	// No action expected, but should not panic
+	assert.True(t, true) // Just verifying no panic occurred
+}
+
+// Run the test suite
+func TestMain(t *testing.T) {
+	suite.Run(t, new(NamespaceCleanerTestSuite))
 }
