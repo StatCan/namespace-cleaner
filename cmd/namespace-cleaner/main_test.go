@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -17,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -26,25 +25,14 @@ import (
 // Test Suite Struct
 type NamespaceCleanerTestSuite struct {
 	suite.Suite
-	client    *fake.Clientset
-	ctx       context.Context
-	config    Config
-	graceDate string
+	client *fake.Clientset
+	ctx    context.Context
+	config Config
 }
-
-// Constants for test fixtures
-const (
-	testNamespace   = "test-namespace"
-	labelTimeLayout = "2006-01-02_15-04-05Z"
-)
 
 // Setup test environment
 func (s *NamespaceCleanerTestSuite) SetupTest() {
 	s.ctx = context.Background()
-	now := time.Now().UTC()
-
-	s.graceDate = now.AddDate(0, 0, 7).Format(labelTimeLayout)
-
 	s.config = Config{
 		TestMode:       true,
 		TestUsers:      []string{"test@example.com"},
@@ -55,8 +43,13 @@ func (s *NamespaceCleanerTestSuite) SetupTest() {
 	log.SetOutput(io.Discard)
 }
 
+// Helper to create timestamp string
+func getGraceDate(days int) string {
+	return time.Now().UTC().AddDate(0, 0, days).Format("2006-01-02_15-04-05Z")
+}
+
 // Helper to compare namespace state
-func (s *NamespaceCleanerTestSuite) logNamespaceDiff(initial, final *v1.Namespace) {
+func (s *NamespaceCleanerTestSuite) logNamespaceDiff(initial, final *corev1.Namespace) {
 	if !s.T().Failed() {
 		return
 	}
@@ -105,7 +98,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 		{
 			name: "Namespace with invalid owner domain",
 			namespaces: []runtime.Object{
-				&v1.Namespace{
+				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "invalid-owner",
 						Annotations: map[string]string{
@@ -120,7 +113,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 		{
 			name: "Valid owner with existing user",
 			namespaces: []runtime.Object{
-				&v1.Namespace{
+				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "valid-owner",
 						Annotations: map[string]string{
@@ -135,7 +128,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 		{
 			name: "Valid owner with non-existent user",
 			namespaces: []runtime.Object{
-				&v1.Namespace{
+				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "invalid-user",
 						Annotations: map[string]string{
@@ -144,17 +137,17 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 					},
 				},
 			},
-			expectedPatches: 1, // Add delete-at label
+			expectedPatches: 1,
 			expectedDeletes: 0,
 		},
 		{
 			name: "Expired namespace with delete-at label",
 			namespaces: []runtime.Object{
-				&v1.Namespace{
+				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "expired-namespace",
 						Labels: map[string]string{
-							"namespace-cleaner/delete-at": time.Now().AddDate(0, 0, -1).Format(labelTimeLayout),
+							"namespace-cleaner/delete-at": getGraceDate(-1),
 						},
 						Annotations: map[string]string{
 							"owner": "notfound@example.com",
@@ -163,12 +156,12 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 				},
 			},
 			expectedPatches: 0,
-			expectedDeletes: 1, // Namespace should be deleted
+			expectedDeletes: 1,
 		},
 		{
 			name: "Namespace without delete-at label",
 			namespaces: []runtime.Object{
-				&v1.Namespace{
+				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "no-delete-label",
 						Annotations: map[string]string{
@@ -177,7 +170,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 					},
 				},
 			},
-			expectedPatches: 1, // Add delete-at label
+			expectedPatches: 1,
 			expectedDeletes: 0,
 		},
 	}
@@ -193,7 +186,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			}
 
 			// Capture initial state
-			initialNamespaces := make(map[string]*v1.Namespace)
+			initialNamespaces := make(map[string]*corev1.Namespace)
 			nsList, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
 			for _, ns := range nsList.Items {
 				initialNamespaces[ns.Name] = ns.DeepCopy()
@@ -203,7 +196,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			processNamespaces(s.ctx, nil, s.client, s.config)
 
 			// Capture final state
-			finalNamespaces := make(map[string]*v1.Namespace)
+			finalNamespaces := make(map[string]*corev1.Namespace)
 			nsList, _ = s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
 			for _, ns := range nsList.Items {
 				finalNamespaces[ns.Name] = ns.DeepCopy()
@@ -345,27 +338,32 @@ func TestUserExists_NonTestMode(t *testing.T) {
 	}
 }
 
-// Mock request adapter for MS Graph
 type mockRequestAdapter struct {
 	BaseUrl string
 }
 
-func (m *mockRequestAdapter) GetBaseURL() string {
-	return m.BaseUrl
+func (m *mockRequestAdapter) ConvertToNativeRequest() (*http.Request, error) {
+	return http.NewRequest("GET", m.BaseUrl, nil)
 }
 
-func (m *mockRequestAdapter) Send(ctx context.Context, request *http.Request, response interface{}, errorMapping map[string]func(error) error) error {
+func (m *mockRequestAdapter) Send(
+	ctx context.Context,
+	request *http.Request,
+	response interface{},
+	errorMapping map[string]func(error) error,
+) error {
+	// Simulate successful response
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		return errors.New("http error")
-	}
-
 	return json.NewDecoder(resp.Body).Decode(response)
+}
+
+func (m *mockRequestAdapter) GetBaseURL() string {
+	return m.BaseUrl
 }
 
 // Test Kubernetes client initialization
@@ -386,10 +384,8 @@ func TestInitKubeClient(t *testing.T) {
 
 // Test namespace labeling logic
 func TestNamespaceLabeling(t *testing.T) {
-	now := time.Now().UTC()
-	graceDate := now.AddDate(0, 0, 7).Format(labelTimeLayout)
-
-	ns := &v1.Namespace{
+	graceDate := getGraceDate(7)
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 			Annotations: map[string]string{
@@ -427,7 +423,7 @@ func TestNamespaceLabeling(t *testing.T) {
 
 // Test dry run behavior
 func TestDryRunMode(t *testing.T) {
-	ns := &v1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 			Annotations: map[string]string{
@@ -457,7 +453,7 @@ func TestDryRunMode(t *testing.T) {
 
 // Test label parsing errors
 func TestLabelParsingErrors(t *testing.T) {
-	ns := &v1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "invalid-label",
 			Labels: map[string]string{
