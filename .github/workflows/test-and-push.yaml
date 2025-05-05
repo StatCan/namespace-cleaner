@@ -50,12 +50,11 @@ jobs:
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          context: .
+          builder: ${{ steps.buildx.outputs.name }} # <--- this connects it to the builder!
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          builder: ${{ steps.buildx.outputs.name }}
 
       - name: Security Scan
         uses: aquasecurity/trivy-action@0.30.0

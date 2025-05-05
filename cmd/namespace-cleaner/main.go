@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"slices"
+
 	msauth "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	odataerrors "github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
@@ -138,12 +140,7 @@ func validDomain(email string, domains []string) bool {
 		return false
 	}
 	domain := parts[1]
-	for _, d := range domains {
-		if d == domain {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(domains, domain)
 }
 
 // processNamespaces labels or deletes namespaces based on owner existence and delete-at
@@ -171,9 +168,9 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Would label %s with delete-at=%s", ns.Name, graceDate)
 			} else {
-				patch := []byte(fmt.Sprintf(
+				patch := fmt.Appendf(nil,
 					`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate,
-				))
+				)
 				_, err = kube.CoreV1().Namespaces().Patch(
 					ctx,
 					ns.Name,
