@@ -210,14 +210,14 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	if err != nil {
 		log.Fatalf("Error listing expired namespaces: %v", err)
 	}
-	today := time.Now()
+	today := time.Now().UTC()
 
 	for _, ns := range expired.Items {
 		email := ns.Annotations["owner"]
 
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
-		// parse using custom layout directly
-		deletionDate, err := time.Parse(labelTimeLayout, labelValue)
+		// parse using UTC location
+		deletionDate, err := time.ParseInLocation(labelTimeLayout, labelValue, time.UTC)
 		if err != nil {
 			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
 			// Remove invalid label
@@ -244,14 +244,29 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				}
 			}
 		} else if today.After(deletionDate) {
-			// if still missing and past date, delete namespace
-			log.Printf("Deleting namespace: %s", ns.Name)
+			// Debug logging for time comparison
+			log.Printf("Deleting %s: deletionDate=%v, today=%v", ns.Name, deletionDate, today)
+
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Would delete %s", ns.Name)
 			} else {
+				// In test mode, remove finalizers first
+				if cfg.TestMode {
+					nsCopy := ns.DeepCopy()
+					nsCopy.Finalizers = nil
+					_, err := kube.CoreV1().Namespaces().Update(ctx, nsCopy, metav1.UpdateOptions{})
+					if err != nil {
+						log.Printf("Error removing finalizers from %s: %v", ns.Name, err)
+					} else {
+						log.Printf("Finalizers removed from %s", ns.Name)
+					}
+				}
+
 				err := kube.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 				if err != nil {
 					log.Printf("Error deleting ns: %v", err)
+				} else {
+					log.Printf("Deletion initiated for %s", ns.Name)
 				}
 			}
 		}
