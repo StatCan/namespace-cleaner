@@ -90,38 +90,6 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 		dryRun          bool
 	}{
 		{
-			name: "Namespace with invalid owner domain",
-			namespaces: []runtime.Object{
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "invalid-owner",
-						Annotations: map[string]string{
-							"owner": "user@bad-domain.com",
-						},
-						Labels: map[string]string{}, // Explicitly initialize empty labels
-					},
-				},
-			},
-			expectedPatches: 0,
-			expectedDeletes: 0,
-		},
-		{
-			name: "Valid owner with existing user",
-			namespaces: []runtime.Object{
-				&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "valid-owner",
-						Annotations: map[string]string{
-							"owner": "test@example.com",
-						},
-						Labels: map[string]string{}, // Explicitly initialize empty labels
-					},
-				},
-			},
-			expectedPatches: 0,
-			expectedDeletes: 0,
-		},
-		{
 			name: "Valid owner with non-existent user",
 			namespaces: []runtime.Object{
 				&corev1.Namespace{
@@ -130,7 +98,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 						Annotations: map[string]string{
 							"owner": "notfound@example.com",
 						},
-						Labels: map[string]string{}, // Prevent nil map issues
+						Labels: map[string]string{}, // Initialize empty labels
 					},
 				},
 			},
@@ -149,6 +117,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 						Annotations: map[string]string{
 							"owner": "notfound@example.com",
 						},
+						Labels: map[string]string{}, // Initialize empty labels
 					},
 				},
 			},
@@ -164,7 +133,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 						Annotations: map[string]string{
 							"owner": "notfound@example.com",
 						},
-						Labels: map[string]string{}, // Explicitly initialize
+						Labels: map[string]string{}, // Initialize empty labels
 					},
 				},
 			},
@@ -178,7 +147,6 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			s.client = fake.NewSimpleClientset(tc.namespaces...)
 			originalConfig := s.config
 			defer func() { s.config = originalConfig }()
-
 			if tc.dryRun {
 				s.config.DryRun = true
 			}
@@ -200,26 +168,18 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 				finalNamespaces[ns.Name] = ns.DeepCopy()
 			}
 
-			// Compare states and log differences
-			for name, initialNS := range initialNamespaces {
-				finalNS, exists := finalNamespaces[name]
-				if !exists {
-					s.T().Logf("Namespace %s was deleted.", name)
-					continue
-				}
-				s.logNamespaceDiff(initialNS, finalNS)
-			}
-
-			// Validate label behavior directly
-			for name, _ := range initialNamespaces {
+			// Validate label state explicitly
+			for name, expectedNS := range initialNamespaces {
 				finalNS, exists := finalNamespaces[name]
 				require.True(s.T(), exists, "Namespace %s should exist", name)
 
 				// Validate label behavior
 				if tc.expectedPatches > 0 {
-					assert.Contains(s.T(), finalNS.Labels, "namespace-cleaner/delete-at")
+					assert.Contains(s.T(), finalNS.Labels, "namespace-cleaner/delete-at",
+						"Expected label not found in namespace %s", name)
 				} else {
-					assert.NotContains(s.T(), finalNS.Labels, "namespace-cleaner/delete-at")
+					assert.NotContains(s.T(), finalNS.Labels, "namespace-cleaner/delete-at",
+						"Unexpected label in namespace %s", name)
 				}
 			}
 

@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"strings"
 	"time"
@@ -101,22 +101,18 @@ func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceCl
 	return client
 }
 
-// initKubeClient initializes Kubernetes in-cluster client
+// initKubeClient initializes Kubernetes in-cluster client or returns an error
 func initKubeClient(cfg *rest.Config) (*kubernetes.Clientset, error) {
 	if cfg != nil {
 		return kubernetes.NewForConfig(cfg)
 	}
 
-	// In-cluster config (requires env vars)
-	host := os.Getenv("KUBERNETES_SERVICE_HOST")
-	port := os.Getenv("KUBERNETES_SERVICE_PORT")
-	if host != "" && port != "" {
-		return kubernetes.NewForConfig(&rest.Config{
-			Host: "https://" + net.JoinHostPort(host, port),
-		})
+	// Try in-cluster config (only available inside Kubernetes pods)
+	if inClusterCfg, err := rest.InClusterConfig(); err == nil {
+		return kubernetes.NewForConfig(inClusterCfg)
 	}
 
-	// Out-of-cluster fallback
+	// Fall back to mockable out-of-cluster config if KUBECONFIG is set
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		return kubernetes.NewForConfig(&rest.Config{
 			Host: "http://localhost:8080",
@@ -124,7 +120,7 @@ func initKubeClient(cfg *rest.Config) (*kubernetes.Clientset, error) {
 	}
 
 	// Default failure case
-	return nil, fmt.Errorf("no valid Kubernetes config found")
+	return nil, errors.New("no valid Kubernetes config found")
 }
 
 // userExists checks if a user exists in Graph (or test list)
