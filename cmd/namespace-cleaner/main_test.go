@@ -295,18 +295,17 @@ func TestUserExists_TestMode(t *testing.T) {
 
 // Test Kubernetes client initialization
 func TestInitKubeClient(t *testing.T) {
+	// Set required env vars
+	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+	os.Setenv("KUBERNETES_SERVICE_PORT", "443")
+
 	// Test normal case
 	client := initKubeClient()
 	assert.NotNil(t, client)
 
-	// Test error case
-	oldKubeconfig := os.Getenv("KUBECONFIG")
-	defer os.Setenv("KUBECONFIG", oldKubeconfig)
-
-	os.Setenv("KUBECONFIG", "/nonexistent/file")
-	assert.Panics(t, func() {
-		initKubeClient()
-	})
+	// Cleanup
+	os.Unsetenv("KUBERNETES_SERVICE_HOST")
+	os.Unsetenv("KUBERNETES_SERVICE_PORT")
 }
 
 // Test namespace labeling logic

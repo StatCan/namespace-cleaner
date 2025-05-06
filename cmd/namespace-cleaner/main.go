@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"slices"
-
 	msauth "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	odataerrors "github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
@@ -63,6 +61,11 @@ func getGracePeriod() int {
 	}
 	var days int
 	fmt.Sscanf(val, "%d", &days)
+
+	// Ensure minimum value of 0
+	if days <= 0 {
+		return 0
+	}
 	return days
 }
 
@@ -140,7 +143,13 @@ func validDomain(email string, domains []string) bool {
 		return false
 	}
 	domain := parts[1]
-	return slices.Contains(domains, domain)
+
+	for _, allowed := range domains {
+		if domain == allowed || strings.HasSuffix(domain, "."+allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // processNamespaces labels or deletes namespaces based on owner existence and delete-at
