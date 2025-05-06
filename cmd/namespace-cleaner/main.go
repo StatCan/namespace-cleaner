@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -106,15 +107,19 @@ func initKubeClient(cfg *rest.Config) (*kubernetes.Clientset, error) {
 		return kubernetes.NewForConfig(cfg)
 	}
 
-	// Try in-cluster config (only available inside Kubernetes pods)
-	if inClusterCfg, err := rest.InClusterConfig(); err == nil {
-		return kubernetes.NewForConfig(inClusterCfg)
+	// In-cluster config (requires env vars)
+	host := os.Getenv("KUBERNETES_SERVICE_HOST")
+	port := os.Getenv("KUBERNETES_SERVICE_PORT")
+	if host != "" && port != "" {
+		return kubernetes.NewForConfig(&rest.Config{
+			Host: "https://" + net.JoinHostPort(host, port),
+		})
 	}
 
-	// Fall back to out-of-cluster config if KUBECONFIG is set
+	// Out-of-cluster fallback
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		return kubernetes.NewForConfig(&rest.Config{
-			Host: "http://localhost:8080", // Dummy value for tests
+			Host: "http://localhost:8080",
 		})
 	}
 
