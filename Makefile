@@ -4,7 +4,7 @@ test-integration: docker-build
 	@echo "🚀 Focused Integration Test - Namespace Deletion"
 	@kind create cluster --image kindest/node:v1.27.3 --name ns-cleaner-test
 	@kind load docker-image namespace-cleaner:test --name ns-cleaner-test
-	@timeout 5m ./scripts/integration-test.sh || (echo "❌ Test failed"; kind delete cluster --name ns-cleaner-test; exit 1)
+	@timeout 5m ./tests/integration-test.sh || (echo "❌ Test failed"; kind delete cluster --name ns-cleaner-test; exit 1)
 	@kind delete cluster --name ns-cleaner-test
 	@echo "✅ All tests passed"
 
