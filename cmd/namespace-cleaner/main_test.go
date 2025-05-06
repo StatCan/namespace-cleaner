@@ -117,7 +117,6 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 						Annotations: map[string]string{
 							"owner": "notfound@example.com",
 						},
-						Labels: map[string]string{}, // Initialize empty labels
 					},
 				},
 			},
@@ -169,7 +168,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			}
 
 			// Validate label state explicitly
-			for name, expectedNS := range initialNamespaces {
+			for name, _ := range initialNamespaces {
 				finalNS, exists := finalNamespaces[name]
 				require.True(s.T(), exists, "Namespace %s should exist", name)
 
