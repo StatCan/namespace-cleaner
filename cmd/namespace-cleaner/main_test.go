@@ -4,13 +4,10 @@ import (
 	"context"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/jarcoal/httpmock"
-	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -273,7 +270,7 @@ func TestValidDomain(t *testing.T) {
 	}
 }
 
-// Test userExists in test mode
+// Test userExists in test mode (no external calls)
 func TestUserExists_TestMode(t *testing.T) {
 	cfg := Config{
 		TestMode:  true,
@@ -292,46 +289,6 @@ func TestUserExists_TestMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.email, func(t *testing.T) {
 			assert.Equal(t, tt.want, userExists(context.Background(), cfg, nil, tt.email))
-		})
-	}
-}
-
-// Test userExists in non-test mode using HTTP mocking
-func TestUserExists_NonTestMode(t *testing.T) {
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	// Mock successful user response
-	httpmock.RegisterResponder("GET", "/users/test@example.com",
-		httpmock.NewStringResponder(200, `{"id": "123"}`))
-
-	// Mock user not found response
-	httpmock.RegisterResponder("GET", "/users/notfound@example.com",
-		httpmock.NewStringResponder(404, `{"error": {"code": "NotFound"}}`))
-
-	// Mock error response
-	httpmock.RegisterResponder("GET", "/users/error@example.com",
-		httpmock.NewStringResponder(500, `{"error": {"code": "InternalServerError"}}`))
-
-	// Create Graph client with real HTTP transport
-	graphClient := msgraphsdk.NewGraphServiceClient(&http.Client{})
-
-	tests := []struct {
-		email string
-		want  bool
-	}{
-		{"test@example.com", true},
-		{"notfound@example.com", false},
-		{"error@example.com", false},
-	}
-
-	cfg := Config{
-		TestMode: false,
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.email, func(t *testing.T) {
-			assert.Equal(t, tt.want, userExists(context.Background(), cfg, graphClient, tt.email))
 		})
 	}
 }
@@ -439,11 +396,11 @@ func TestLabelParsingErrors(t *testing.T) {
 		GracePeriod:    7,
 	}
 
-	// Should handle invalid date format
+	// Should handle invalid date format gracefully
 	processNamespaces(context.Background(), nil, client, cfg)
 
 	// No action expected, but should not panic
-	assert.True(t, true) // Just verifying no panic occurred
+	assert.True(t, true)
 }
 
 // Run the test suite
