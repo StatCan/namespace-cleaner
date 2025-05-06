@@ -1,4 +1,3 @@
----
 name: CI Pipeline
 
 on:
@@ -9,6 +8,22 @@ env:
   REGISTRY: k8scc01covidacr.azurecr.io
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Run Go Lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -21,7 +36,7 @@ jobs:
         with:
           go-version: "1.21"
 
-      - name: Run Unit Tests with Debug
+      - name: Run Unit Tests
         run: |
           echo "::group::📦 Unit Test Output"
           make test-unit
@@ -34,7 +49,7 @@ jobs:
 
   build-push:
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: [lint, unit-tests]
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +74,7 @@ jobs:
           push: true
 
       - name: Security Scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           severity: "CRITICAL"
