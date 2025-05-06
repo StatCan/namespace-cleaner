@@ -168,7 +168,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			}
 
 			// Validate label state explicitly
-			for name, _ := range initialNamespaces {
+			for name := range initialNamespaces {
 				finalNS, exists := finalNamespaces[name]
 				require.True(s.T(), exists, "Namespace %s should exist", name)
 
