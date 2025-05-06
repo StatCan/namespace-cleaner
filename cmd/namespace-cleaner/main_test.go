@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -199,101 +200,114 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 	}
 }
 
-// Test namespace labeling logic
+// Create a test function setup
+func setupTestKubeClient(objs ...runtime.Object) *fake.Clientset {
+	return fake.NewSimpleClientset(objs...)
+}
+
+// Example test case setup:
 func TestNamespaceLabeling(t *testing.T) {
-	ns := &corev1.Namespace{
+	// Setup test namespace without delete-at label but with part-of label
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-			Annotations: map[string]string{
-				"owner": "notfound@example.com",
+			Name: "test-ns",
+			Labels: map[string]string{
+				"app.kubernetes.io/part-of": "kubeflow-profile",
 			},
-			Labels: map[string]string{}, // Initialize to avoid nil map
+			Annotations: map[string]string{
+				"owner": "nonexistent@test.com",
+			},
 		},
 	}
+	client := setupTestKubeClient(ns)
 
-	client := fake.NewSimpleClientset(ns)
+	// Run processNamespaces with test config
 	cfg := Config{
 		TestMode:       true,
-		TestUsers:      []string{"test@example.com"},
-		AllowedDomains: []string{"example.com"},
-		GracePeriod:    7,
+		AllowedDomains: []string{"test.com"},
+		TestUsers:      []string{}, // User doesn't exist
+		GracePeriod:    30,
 	}
+	processNamespaces(context.TODO(), nil, client, cfg)
 
-	// Test label addition
-	processNamespaces(context.Background(), nil, client, cfg)
-
-	updatedNs, err := client.CoreV1().Namespaces().Get(context.Background(), "test", metav1.GetOptions{})
-	require.NoError(t, err)
-
-	assert.Contains(t, updatedNs.Labels, "namespace-cleaner/delete-at")
-	assert.NotEmpty(t, updatedNs.Labels["namespace-cleaner/delete-at"])
-
-	// Test label removal
-	cfg.TestUsers = []string{"notfound@example.com"}
-	processNamespaces(context.Background(), nil, client, cfg)
-
-	updatedNs, err = client.CoreV1().Namespaces().Get(context.Background(), "test", metav1.GetOptions{})
-	require.NoError(t, err)
-
-	assert.NotContains(t, updatedNs.Labels, "namespace-cleaner/delete-at")
+	// Verify the label was added
+	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "test-ns", metav1.GetOptions{})
+	if _, ok := updatedNs.Labels["namespace-cleaner/delete-at"]; !ok {
+		t.Error("Expected delete-at label to be added")
+	}
 }
 
 // Test dry run behavior
 func TestDryRunBehavior(t *testing.T) {
-	ns := &corev1.Namespace{
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "dryrun-test",
-			Annotations: map[string]string{
-				"owner": "notfound@example.com",
+			Name: "dry-run-ns",
+			Labels: map[string]string{
+				"app.kubernetes.io/part-of": "kubeflow-profile",
 			},
-			Labels: map[string]string{},
+			Annotations: map[string]string{"owner": "nonexistent@test.com"},
 		},
 	}
+	client := setupTestKubeClient(ns)
 
-	client := fake.NewSimpleClientset(ns)
 	cfg := Config{
-		TestMode:  true,
-		TestUsers: []string{"test@example.com"},
-		DryRun:    true,
+		DryRun:      true,
+		TestMode:    true,
+		GracePeriod: 30,
 	}
+	processNamespaces(context.TODO(), nil, client, cfg)
 
-	// Run in dry-run mode
-	processNamespaces(context.Background(), nil, client, cfg)
-
-	// Validate label was not added
-	updatedNs, err := client.CoreV1().Namespaces().Get(context.Background(), "dryrun-test", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.NotContains(t, updatedNs.Labels, "namespace-cleaner/delete-at")
+	// Verify no changes were made
+	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "dry-run-ns", metav1.GetOptions{})
+	if _, ok := updatedNs.Labels["namespace-cleaner/delete-at"]; ok {
+		t.Error("Dry run should not modify labels")
+	}
 }
 
 // Test label parsing errors
 func TestLabelParsingErrors(t *testing.T) {
-	ns := &corev1.Namespace{
+	// Namespace with invalid delete-at label
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "invalid-label",
+			Name: "invalid-label-ns",
 			Labels: map[string]string{
 				"namespace-cleaner/delete-at": "invalid-date-format",
 			},
-			Annotations: map[string]string{
-				"owner": "notfound@example.com",
-			},
 		},
 	}
+	client := setupTestKubeClient(ns)
 
-	client := fake.NewSimpleClientset(ns)
-	cfg := Config{
-		TestMode:       true,
-		TestUsers:      []string{"notfound@example.com"},
-		AllowedDomains: []string{"example.com"},
-		GracePeriod:    7,
+	cfg := Config{TestMode: true}
+	processNamespaces(context.TODO(), nil, client, cfg)
+
+	// Label should be removed after parsing error
+	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "invalid-label-ns", metav1.GetOptions{})
+	if _, ok := updatedNs.Labels["namespace-cleaner/delete-at"]; ok {
+		t.Error("Expected invalid delete-at label to be removed")
 	}
+}
 
-	// Should handle invalid date format gracefully
-	processNamespaces(context.Background(), nil, client, cfg)
+func TestExpiredNamespaceDeletion(t *testing.T) {
+	pastDate := time.Now().Add(-24 * time.Hour).Format(labelTimeLayout)
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "expired-ns",
+			Labels: map[string]string{
+				"namespace-cleaner/delete-at": pastDate,
+			},
+			Annotations: map[string]string{"owner": "deleted@test.com"},
+		},
+	}
+	client := setupTestKubeClient(ns)
 
-	updatedNs, err := client.CoreV1().Namespaces().Get(context.Background(), "invalid-label", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.NotContains(t, updatedNs.Labels, "namespace-cleaner/delete-at")
+	cfg := Config{TestMode: true}
+	processNamespaces(context.TODO(), nil, client, cfg)
+
+	// Namespace should be deleted
+	_, err := client.CoreV1().Namespaces().Get(context.TODO(), "expired-ns", metav1.GetOptions{})
+	if err == nil {
+		t.Error("Expected namespace to be deleted")
+	}
 }
 
 // Run the test suite

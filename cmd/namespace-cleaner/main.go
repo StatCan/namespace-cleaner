@@ -188,9 +188,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Would label %s with delete-at=%s", ns.Name, graceDate)
 			} else {
-				patch := fmt.Appendf(nil,
-					`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate,
-				)
+				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))
 				_, err = kube.CoreV1().Namespaces().Patch(
 					ctx,
 					ns.Name,
@@ -222,6 +220,14 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		deletionDate, err := time.Parse(labelTimeLayout, labelValue)
 		if err != nil {
 			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
+			// Remove invalid label
+			if !cfg.DryRun {
+				patch := []byte(`{"metadata":{"labels":{"namespace-cleaner/delete-at":null}}}`)
+				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+				if err != nil {
+					log.Printf("Error removing invalid label: %v", err)
+				}
+			}
 			continue
 		}
 
