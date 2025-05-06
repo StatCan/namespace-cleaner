@@ -1,24 +1,24 @@
 .PHONY: test-unit test-integration docker-build
 
 test-integration: docker-build
-	@echo "=============================================="
-	@echo "🚀 Starting integration tests at $(shell date)"
-	@echo "⚙️  Test configuration:"
-	@echo "    - Kind cluster: v1.27"
-	@echo "    - Test namespaces: 3"
-	@echo "=============================================="
+    @echo "=============================================="
+    @echo "🚀 Starting integration tests at $(shell date)"
+    @echo "⚙️  Test configuration:"
+    @echo "    - Cleaner image: namespace-cleaner:test"
+    @echo "    - Test timeout: 3 minutes"
+    @echo "=============================================="
 
-	@echo "\n🛠️  Creating Kind cluster..."
-	@kind create cluster --image kindest/node:v1.27.3 --name namespace-cleaner-test
+    @echo "\n🛠️  Creating Kind cluster..."
+    @kind create cluster --image kindest/node:v1.27.3 --name namespace-cleaner-test --wait 2m
 
-	@echo "\n📦 Loading test image into cluster..."
-	@kind load docker-image namespace-cleaner:test --name namespace-cleaner-test
+    @echo "\n📦 Loading test image into cluster..."
+    @kind load docker-image namespace-cleaner:test --name namespace-cleaner-test --nodes namespace-cleaner-test-control-plane
 
-	@echo "\n🔍 Running integration test scenarios..."
-	@./tests/integration-test.sh
+    @echo "\n🔍 Running integration test scenarios..."
+    @timeout 3m ./tests/integration-test.sh || (echo "❌ Integration tests timed out"; exit 1)
 
-	@echo "\n✅ Integration tests completed at $(shell date)"
-	@echo "=============================================="
+    @echo "\n✅ Integration tests completed at $(shell date)"
+    @echo "=============================================="
 
 test-unit:
 	@echo "=============================================="
