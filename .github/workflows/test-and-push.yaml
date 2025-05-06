@@ -1,3 +1,4 @@
+---
 name: CI Pipeline
 
 on:
@@ -26,6 +27,16 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           only-new-issues: false
           install-mode: binary
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Lint YAML Files
+        run: |
+          pip install yamllint
+          yamllint .
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -84,3 +95,9 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
           format: table
+          db-repositories: |
+            ghcr.io/aquasecurity/trivy-db:2
+            public.ecr.aws/aquasecurity/trivy-db
+          java-db-repositories: |
+            ghcr.io/aquasecurity/trivy-java-db:1
+            public.ecr.aws/aquasecurity/trivy-java-db
