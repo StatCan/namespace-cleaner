@@ -8,7 +8,6 @@ metadata:
     app.kubernetes.io/part-of: kubeflow-profile
   annotations:
     owner: test-user@company.com
-
 ---
 apiVersion: v1
 kind: Namespace
@@ -19,7 +18,6 @@ metadata:
     namespace-cleaner/delete-at: "2000-01-01_00-00-00Z"
   annotations:
     owner: "invalid-user@example.org"
-
 ---
 apiVersion: v1
 kind: Namespace
@@ -30,4 +28,3 @@ metadata:
     namespace-cleaner/delete-at: "2000-01-01_00-00-00Z"
   annotations:
     owner: "missing-user@company.com"
-
