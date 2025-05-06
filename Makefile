@@ -15,7 +15,7 @@ test-integration: docker-build
 	@kind load docker-image namespace-cleaner:test --name namespace-cleaner-test
 
 	@echo "\n🔍 Running integration test scenarios..."
-	@./scripts/integration-test.sh
+	@./tests/integration-test.sh
 
 	@echo "\n✅ Integration tests completed at $(shell date)"
 	@echo "=============================================="
