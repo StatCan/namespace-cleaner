@@ -1,4 +1,3 @@
----
 name: CI Pipeline
 
 on:
@@ -7,6 +6,7 @@ on:
 
 env:
   REGISTRY: k8scc01covidacr.azurecr.io
+  KIND_VERSION: v0.20.0
 
 jobs:
   lint:
@@ -25,8 +25,6 @@ jobs:
           version: latest
           args: --timeout=5m --out-format=colored-line-number
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          only-new-issues: false
-          install-mode: binary
 
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
@@ -34,6 +32,9 @@ jobs:
           dockerfile: Dockerfile
 
       - name: Lint YAML Files
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
         run: |
           pip install yamllint
           yamllint .
@@ -42,11 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          cache: false
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: "1.21"
 
@@ -61,7 +58,20 @@ jobs:
         with:
           file: coverage.out
 
-  build-push:
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Kind
+        uses: helm/kind-action@v1.8.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+
+      - name: Run Integration Tests
+        run: make test-integration
+
+  build-scan-push:
     runs-on: ubuntu-latest
     needs: [lint, unit-tests]
     steps:
@@ -71,7 +81,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
-          use: true
           install: true
 
       - name: Login to ACR
@@ -81,11 +90,12 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Build and Push
+      - name: Build and Scan
         uses: docker/build-push-action@v5
         with:
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
-          push: true
+          push: false
+          sbom: true
 
       - name: Security Scan
         uses: aquasecurity/trivy-action@master
@@ -101,3 +111,9 @@ jobs:
           java-db-repositories: |
             ghcr.io/aquasecurity/trivy-java-db:1
             public.ecr.aws/aquasecurity/trivy-java-db
+
+      - name: Push to ACR
+        uses: docker/build-push-action@v5
+        with:
+          tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
+          push: true

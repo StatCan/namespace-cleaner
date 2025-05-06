@@ -1,6 +1,26 @@
-.PHONY: test-unit docker-build
+.PHONY: test-unit test-integration docker-build
 
-test-unit: docker-build
+test-integration: docker-build
+	@echo "=============================================="
+	@echo "🚀 Starting integration tests at $(shell date)"
+	@echo "⚙️  Test configuration:"
+	@echo "    - Kind cluster: v1.27"
+	@echo "    - Test namespaces: 3"
+	@echo "=============================================="
+
+	@echo "\n🛠️  Creating Kind cluster..."
+	@kind create cluster --image kindest/node:v1.27.3 --name namespace-cleaner-test
+
+	@echo "\n📦 Loading test image into cluster..."
+	@kind load docker-image namespace-cleaner:test --name namespace-cleaner-test
+
+	@echo "\n🔍 Running integration test scenarios..."
+	@./scripts/integration-test.sh
+
+	@echo "\n✅ Integration tests completed at $(shell date)"
+	@echo "=============================================="
+
+test-unit:
 	@echo "=============================================="
 	@echo "🚀 Starting unit tests at $(shell date)"
 	@echo "⚙️  Test configuration:"
