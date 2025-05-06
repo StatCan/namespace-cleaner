@@ -64,10 +64,8 @@ func getGracePeriod() int {
 		return 30
 	}
 	var days int
-	fmt.Sscanf(val, "%d", &days)
-
-	// Ensure minimum value of 0
-	if days <= 0 {
+	_, err := fmt.Sscanf(val, "%d", &days)
+	if err != nil || days < 0 {
 		return 0
 	}
 	return days

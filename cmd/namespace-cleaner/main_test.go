@@ -42,7 +42,7 @@ func getGraceDate(days int) string {
 	return time.Now().UTC().AddDate(0, 0, days).Format("2006-01-02_15-04-05Z")
 }
 
-// Helper to compare namespace state
+//nolint:unused
 func (s *NamespaceCleanerTestSuite) logNamespaceDiff(initial, final *corev1.Namespace) {
 	if !s.T().Failed() {
 		return
