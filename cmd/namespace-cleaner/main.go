@@ -48,7 +48,10 @@ func main() {
 
 	ctx := context.Background()
 	graphClient := initGraphClient(ctx, cfg)
-	kubeClient := initKubeClient()
+	kubeClient, err := initKubeClient(nil)
+	if err != nil {
+		log.Fatalf("Failed to initialize Kubernetes client: %v", err)
+	}
 
 	processNamespaces(ctx, graphClient, kubeClient, cfg)
 }
@@ -109,14 +112,13 @@ func initKubeClient(cfg *rest.Config) (*kubernetes.Clientset, error) {
 	}
 
 	// Fall back to out-of-cluster config if KUBECONFIG is set
-	kubeconfig := os.Getenv("KUBECONFIG")
-	if kubeconfig != "" {
-		return kubernetes.NewForConfigOrDie(&rest.Config{
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		return kubernetes.NewForConfig(&rest.Config{
 			Host: "http://localhost:8080", // Dummy value for tests
-		}), nil
+		})
 	}
 
-	// Default fallback
+	// Default failure case
 	return nil, fmt.Errorf("no valid Kubernetes config found")
 }
 
