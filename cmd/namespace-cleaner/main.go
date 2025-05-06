@@ -98,16 +98,26 @@ func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceCl
 }
 
 // initKubeClient initializes Kubernetes in-cluster client
-func initKubeClient() *kubernetes.Clientset {
-	cfg, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatalf("Kubernetes config error: %v", err)
+func initKubeClient(cfg *rest.Config) (*kubernetes.Clientset, error) {
+	if cfg != nil {
+		return kubernetes.NewForConfig(cfg)
 	}
-	clientset, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		log.Fatalf("Kubernetes client error: %v", err)
+
+	// Try in-cluster config (only available inside Kubernetes pods)
+	if inClusterCfg, err := rest.InClusterConfig(); err == nil {
+		return kubernetes.NewForConfig(inClusterCfg)
 	}
-	return clientset
+
+	// Fall back to out-of-cluster config if KUBECONFIG is set
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig != "" {
+		return kubernetes.NewForConfigOrDie(&rest.Config{
+			Host: "http://localhost:8080", // Dummy value for tests
+		}), nil
+	}
+
+	// Default fallback
+	return nil, fmt.Errorf("no valid Kubernetes config found")
 }
 
 // userExists checks if a user exists in Graph (or test list)

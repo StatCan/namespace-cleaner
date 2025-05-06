@@ -295,17 +295,79 @@ func TestUserExists_TestMode(t *testing.T) {
 
 // Test Kubernetes client initialization
 func TestInitKubeClient(t *testing.T) {
-	// Set required env vars
-	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	os.Setenv("KUBERNETES_SERVICE_PORT", "443")
+	tests := []struct {
+		name          string
+		setupEnv      func()
+		expectPanic   bool
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "InClusterConfig_Success",
+			setupEnv: func() {
+				os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+				os.Setenv("KUBERNETES_SERVICE_PORT", "443")
+			},
+			expectPanic: false,
+		},
+		{
+			name: "OutOfCluster_With_KUBECONFIG",
+			setupEnv: func() {
+				os.Setenv("KUBECONFIG", "/tmp/nonexistent")
+			},
+			expectPanic: false,
+		},
+		{
+			name: "NoConfigSources",
+			setupEnv: func() {
+				os.Unsetenv("KUBERNETES_SERVICE_HOST")
+				os.Unsetenv("KUBERNETES_SERVICE_PORT")
+				os.Unsetenv("KUBECONFIG")
+			},
+			expectPanic:   true,
+			expectError:   true,
+			errorContains: "no valid Kubernetes config found",
+		},
+	}
 
-	// Test normal case
-	client := initKubeClient()
-	assert.NotNil(t, client)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Apply environment setup
+			tt.setupEnv()
+			defer func() {
+				os.Unsetenv("KUBERNETES_SERVICE_HOST")
+				os.Unsetenv("KUBERNETES_SERVICE_PORT")
+				os.Unsetenv("KUBECONFIG")
+			}()
 
-	// Cleanup
-	os.Unsetenv("KUBERNETES_SERVICE_HOST")
-	os.Unsetenv("KUBERNETES_SERVICE_PORT")
+			// Use a recover-based panic checker
+			if tt.expectPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("Expected panic but did not occur")
+					}
+				}()
+			}
+
+			// Run the test
+			cfg, err := initKubeClient(nil)
+
+			// Assert panic expectations
+			if tt.expectPanic {
+				t.FailNow() // Fail early if we reach this point
+			}
+
+			// Assert error expectations
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				assert.Nil(t, cfg)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, cfg)
+			}
+		})
+	}
 }
 
 // Test namespace labeling logic
