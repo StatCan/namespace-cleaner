@@ -5,61 +5,64 @@ on:
   - push
   - pull_request
 
-jobs:  
-  unit-tests:  
-    runs-on: ubuntu-latest  
-    steps:  
-      - uses: actions/checkout@v4  
-        with:  
-          cache: false  # Disable caching to avoid tar errors  
+env:
+  REGISTRY: k8scc01covidacr.azurecr.io
 
-      - name: Setup Go  
-        uses: actions/setup-go@v4  
-        with:  
-          go-version: "1.21"  
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          cache: false
 
-      - name: Run Unit Tests with Debug  
-        run: |  
-          echo "::group::📦 Unit Test Output"  
-          make test-unit  
-          echo "::endgroup::"  
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
 
-      - name: Upload Coverage  
-        uses: codecov/codecov-action@v3  
-        with:  
-          file: coverage.out  
+      - name: Run Unit Tests with Debug
+        run: |
+          echo "::group::📦 Unit Test Output"
+          make test-unit
+          echo "::endgroup::"
 
-  build-push:  
-    runs-on: ubuntu-latest  
-    needs: unit-tests  
-    steps:  
-      - uses: actions/checkout@v4  
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage.out
 
-      - name: Set up Docker Buildx  
-        uses: docker/setup-buildx-action@v3  
-        with:  
-          driver: docker-container  
-          use: true  
-          install: true  
+  build-push:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Login to ACR  
-        uses: azure/docker-login@v1  
-        with:  
-          login-server: ${{ env.REGISTRY }}  
-          username: ${{ secrets.REGISTRY_USERNAME }}  
-          password: ${{ secrets.REGISTRY_PASSWORD }}  
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          use: true
+          install: true
 
-      - name: Build and Push  
-        uses: docker/build-push-action@v5  
-        with:  
-          tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}  
-          push: true  
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Security Scan  
-        uses: aquasecurity/trivy-action@0.30.0  
-        with:  
-          image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}  
-          severity: "CRITICAL"  
-          ignore-unfixed: true  
-          exit-code: 1  
-          format: table  
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
+          push: true
+
+      - name: Security Scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
+          severity: "CRITICAL"
+          ignore-unfixed: true
+          exit-code: 1
+          format: table
