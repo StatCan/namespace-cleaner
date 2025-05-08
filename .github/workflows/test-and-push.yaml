@@ -42,11 +42,14 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
             ${{ runner.os }}-go-
+
+      - name: Clean Go module cache
+        run: go clean -modcache
 
       - name: Install gobadge
         run: go install github.com/AlexBeauchemin/gobadge@latest
@@ -59,11 +62,15 @@ jobs:
         with:
           file: coverage.out
 
-      - name: Upload Coverage Badge
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-badge
-          path: coverage-report/coverage.svg
+      - name: Commit updated README
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add README.md
+          git commit -m "Update coverage badge" || echo "No changes to commit"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-push:
     runs-on: ubuntu-latest
@@ -95,9 +102,3 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
           format: table
-          db-repositories: |
-            ghcr.io/aquasecurity/trivy-db:2
-            public.ecr.aws/aquasecurity/trivy-db
-          java-db-repositories: |
-            ghcr.io/aquasecurity/trivy-java-db:1
-            public.ecr.aws/aquasecurity/trivy-java-db
