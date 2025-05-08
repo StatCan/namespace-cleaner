@@ -13,21 +13,22 @@ test-unit:
 	@echo "    namespace-cleaner/cmd/namespace-cleaner"
 
 	@echo "\n🔍 Running tests with detailed output..."
+	@mkdir -p coverage-report  # Create output directory
 
 	@set -e; \
-	go test -v -race -coverprofile=coverage.out -covermode=atomic ./cmd/namespace-cleaner \
+	cd cmd/namespace-cleaner && \
+	go test -v -race -coverprofile=../../coverage-report/coverage.out -covermode=atomic . \
 		| sed 's/^/   ▶ /'
 
 	@echo "\n📊 Coverage summary:"
-	@go tool cover -func=coverage.out | awk '/total:/ {printf "    Total Coverage: %s\n", $$3}'
+	@go tool cover -func=coverage-report/coverage.out | awk '/total:/ {printf "    Total Coverage: %s\n", $$3}'
 
 	@echo "\n🛡️  Generating coverage badge..."
-	@gobadge -filename=coverage.out -green=80 -yellow=60 -target=coverage.svg
-	@echo "✅ Coverage badge generated: coverage.svg"
+	@gobadge -filename=coverage-report/coverage.out -green=80 -yellow=60 -target=coverage-report/coverage.svg
+	@echo "✅ Coverage badge generated: coverage-report/coverage.svg"
 
 	@echo "\n✅ Unit tests completed at $(shell date)"
 	@echo "=============================================="
-
 docker-build:
 	@echo "🐳 Building Docker image..."
 	@echo "    Image tag: namespace-cleaner:test"
