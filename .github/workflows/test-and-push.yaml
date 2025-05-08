@@ -61,6 +61,7 @@ jobs:
           sudo chown -R $USER:$USER $HOME/.kube
           sudo usermod -a -G microk8s $USER
           newgrp microk8s || true
+          sudo microk8s kubectl create namespace das || true
 
       - name: Build Test Image
         run: |
