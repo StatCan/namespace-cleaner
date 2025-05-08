@@ -22,7 +22,7 @@ test-unit:
 	@go tool cover -func=coverage.out | awk '/total:/ {printf "    Total Coverage: %s\n", $$3}'
 
 	@echo "\n🛡️  Generating coverage badge..."
-	@gobadge -filename=coverage.out -green=80 -yellow=60 -o coverage.svg
+	@gobadge -filename=coverage.out -green=80 -yellow=60 -target=coverage.svg
 	@echo "✅ Coverage badge generated: coverage.svg"
 
 	@echo "\n✅ Unit tests completed at $(shell date)"
