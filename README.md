@@ -1,5 +1,7 @@
 # Kubernetes Namespace Cleaner
 
+![Test Coverage](https://github.com/StatCan/namespace-cleaner/actions/artifacts/coverage-badge)
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/7f10d356-9312-4483-aea0-33aeef6880d9" alt="Namespace Cleaner Logo" width="400"/>
 </p>
@@ -33,13 +35,13 @@ flowchart TD
     B -->|Test| C[Use Mock Data]
     B -->|Dry Run| D[Preview Actions]
     B -->|Prod| E[Real Azure Auth]
-    
+
     C & D & E --> F[Check New Namespaces]
-    
+
     F --> G1{Valid Domain?}
     G1 -->|Yes| G2{User Exists?}
     G1 -->|No| H[Log & Ignore]
-    
+
     G2 -->|Missing| I[Label for Deletion]
     G2 -->|Exists| J[No Action]
 ```
@@ -50,10 +52,10 @@ flowchart TD
 flowchart TD
     K[Start] --> L[Check Labeled Namespaces]
     L --> M{Grace Period Expired?}
-    
+
     M -->|Yes| N{User Still Missing?}
     M -->|No| O[Keep Namespace]
-    
+
     N -->|Yes| P[Delete Namespace]
     N -->|No| Q[Remove Label]
 ```

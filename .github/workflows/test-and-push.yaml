@@ -37,6 +37,9 @@ jobs:
         with:
           go-version: "1.21"
 
+      - name: Install gobadge
+        run: go install github.com/AlexBeauchemin/gobadge@latest
+
       - name: Run Unit Tests
         run: make test-unit
 
@@ -44,6 +47,12 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: coverage.out
+
+      - name: Upload Coverage Badge
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-badge
+          path: coverage.svg
 
   build-push:
     runs-on: ubuntu-latest

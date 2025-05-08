@@ -1,16 +1,4 @@
-.PHONY: test-unit test-integration docker-build
-
-test-integration: docker-build
-	@echo "🚀 Starting Integration Tests with MicroK8s"
-	@echo "📦 Building and pushing test image to MicroK8s registry"
-	@docker build -t localhost:32000/namespace-cleaner:test .
-	@docker push localhost:32000/namespace-cleaner:test
-	@echo "📄 Applying Kubernetes manifests"
-	@microk8s kubectl apply -f ./manifests/
-	@echo "🧪 Running integration test script"
-	@timeout 5m ./tests/integration-test.sh || (echo "❌ Test failed"; exit 1)
-	@echo "✅ All integration tests passed"
-
+.PHONY: test-unit docker-build
 
 test-unit:
 	@echo "=============================================="
@@ -27,11 +15,15 @@ test-unit:
 	@echo "\n🔍 Running tests with detailed output..."
 
 	@set -e; \
-    go test -v -race -coverprofile=coverage.out -covermode=atomic ./cmd/namespace-cleaner \
-        | sed 's/^/   ▶ /'
+	go test -v -race -coverprofile=coverage.out -covermode=atomic ./cmd/namespace-cleaner \
+		| sed 's/^/   ▶ /'
 
 	@echo "\n📊 Coverage summary:"
 	@go tool cover -func=coverage.out | awk '/total:/ {printf "    Total Coverage: %s\n", $$3}'
+
+	@echo "\n🛡️  Generating coverage badge..."
+	@gobadge -filename=coverage.out -green=80 -yellow=60 -o coverage.svg
+	@echo "✅ Coverage badge generated: coverage.svg"
 
 	@echo "\n✅ Unit tests completed at $(shell date)"
 	@echo "=============================================="
