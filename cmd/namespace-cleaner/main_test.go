@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"testing"
@@ -18,6 +19,14 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// Test Suite Documentation
+// ------------------------
+// Validates namespace cleaner functionality including:
+// - Label application logic
+// - Namespace deletion workflow
+// - Dry run behavior
+// - Error handling for invalid inputs
+
 type NamespaceCleanerTestSuite struct {
 	suite.Suite
 	client *fake.Clientset
@@ -25,6 +34,36 @@ type NamespaceCleanerTestSuite struct {
 	config Config
 }
 
+// Logging Helpers ------------------------------------------------------------
+const (
+	testHeaderFormat = "\n🏷️  TEST CASE: %s\n"
+	sectionFormat    = "📦 %s\n"
+	namespaceFormat  = "  ▸ Namespace: %s\n"
+	labelFormat      = "    - Label: %s=%s\n"
+	annotationFormat = "    - Annotation: %s=%s\n"
+	successFormat    = "  ✓ %s\n"
+	actionFormat     = "  ↳ %s\n"
+)
+
+func (s *NamespaceCleanerTestSuite) logTestStart(name string) {
+	s.T().Logf(testHeaderFormat, name)
+}
+
+func (s *NamespaceCleanerTestSuite) logSection(title string) {
+	s.T().Logf(sectionFormat, title)
+}
+
+func (s *NamespaceCleanerTestSuite) logNamespace(ns corev1.Namespace) {
+	s.T().Logf(namespaceFormat, ns.Name)
+	for k, v := range ns.Labels {
+		s.T().Logf(labelFormat, k, v)
+	}
+	for k, v := range ns.Annotations {
+		s.T().Logf(annotationFormat, k, v)
+	}
+}
+
+// Test Setup ------------------------------------------------------------------
 func (s *NamespaceCleanerTestSuite) SetupTest() {
 	s.ctx = context.Background()
 	s.config = Config{
@@ -34,13 +73,14 @@ func (s *NamespaceCleanerTestSuite) SetupTest() {
 		DryRun:         false,
 		GracePeriod:    7,
 	}
-	log.SetOutput(io.Discard) // suppress std log, rely on t.Logf
+	log.SetOutput(io.Discard)
 }
 
 func getGraceDate(days int) string {
 	return time.Now().UTC().AddDate(0, 0, days).Format(labelTimeLayout)
 }
 
+// Core Test Cases -------------------------------------------------------------
 func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 	testCases := []struct {
 		name            string
@@ -50,7 +90,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 		expectedLabels  map[string]bool
 	}{
 		{
-			name: "Should label namespace with nonexistent user",
+			name: "Label namespace with non-existent owner",
 			namespaces: []runtime.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -69,7 +109,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			expectedLabels:  map[string]bool{"invalid-user": true},
 		},
 		{
-			name: "Should delete namespace with expired label",
+			name: "Delete namespace with expired label",
 			namespaces: []runtime.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -89,7 +129,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 			expectedLabels:  map[string]bool{"expired-namespace": false},
 		},
 		{
-			name: "Should add label to unlabeled namespace",
+			name: "Add label to unlabeled namespace",
 			namespaces: []runtime.Object{
 				&corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
@@ -111,36 +151,54 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
+			// Test Setup
 			s.client = fake.NewSimpleClientset(tc.namespaces...)
-			s.T().Logf("📥 Input: %v", getNamespaceNames(tc.namespaces))
+			s.logTestStart(tc.name)
 
+			// Log Configuration
+			s.logSection("Test Configuration")
+			s.T().Logf(actionFormat, fmt.Sprintf("Dry Run: %t", s.config.DryRun))
+			s.T().Logf(actionFormat, fmt.Sprintf("Grace Period: %d days", s.config.GracePeriod))
+			s.T().Logf(actionFormat, fmt.Sprintf("Allowed Domains: %v", s.config.AllowedDomains))
+
+			// Initial State
+			s.logSection("Initial Namespaces")
 			initialState, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
-			s.T().Logf("🔎 Initial State (%d):", len(initialState.Items))
 			for _, ns := range initialState.Items {
-				s.T().Logf(" - %s: Labels=%v Annotations=%v", ns.Name, ns.Labels, ns.Annotations)
+				s.logNamespace(ns)
 			}
 
+			// Process Namespaces
 			processNamespaces(s.ctx, nil, s.client, s.config)
 
+			// Final State
+			s.logSection("Final Namespaces")
 			finalState, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
-			s.T().Logf("📊 Final State (%d):", len(finalState.Items))
+			if len(finalState.Items) == 0 {
+				s.T().Logf(actionFormat, "No namespaces remaining")
+			}
 			for _, ns := range finalState.Items {
-				s.T().Logf(" - %s: Labels=%v Annotations=%v", ns.Name, ns.Labels, ns.Annotations)
+				s.logNamespace(ns)
 			}
 
+			// Validation
+			s.logSection("Validation Results")
 			for nsName, shouldHaveLabel := range tc.expectedLabels {
 				ns, err := s.client.CoreV1().Namespaces().Get(s.ctx, nsName, metav1.GetOptions{})
+
 				if tc.expectedDeletes > 0 {
-					s.T().Logf("🧪 Deletion Check: %s (should be deleted)", nsName)
-					require.Error(s.T(), err, "❌ Expected %s to be deleted", nsName)
+					require.Error(s.T(), err, "Namespace should be deleted")
+					s.T().Logf(successFormat, fmt.Sprintf("Namespace %s was deleted", nsName))
 					continue
 				}
+
 				require.NoError(s.T(), err)
-				labelPresent := ns.Labels["namespace-cleaner/delete-at"] != ""
-				assert.Equal(s.T(), shouldHaveLabel, labelPresent,
-					"Mismatch for %s: expected label=%v", nsName, shouldHaveLabel)
+				labelExists := ns.Labels["namespace-cleaner/delete-at"] != ""
+				assert.Equal(s.T(), shouldHaveLabel, labelExists)
+				s.T().Logf(successFormat, fmt.Sprintf("Namespace %s label state correct", nsName))
 			}
 
+			// Action Verification
 			var patches, deletes int
 			for _, action := range s.client.Actions() {
 				switch {
@@ -150,23 +208,15 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 					deletes++
 				}
 			}
-			s.T().Logf("🔧 Actions: patches=%d deletes=%d", patches, deletes)
-			assert.Equal(s.T(), tc.expectedPatches, patches)
-			assert.Equal(s.T(), tc.expectedDeletes, deletes)
+			s.T().Logf(actionFormat, fmt.Sprintf("Patches: Expected %d → Actual %d",
+				tc.expectedPatches, patches))
+			s.T().Logf(actionFormat, fmt.Sprintf("Deletions: Expected %d → Actual %d",
+				tc.expectedDeletes, deletes))
 		})
 	}
 }
 
-func getNamespaceNames(objs []runtime.Object) []string {
-	var names []string
-	for _, o := range objs {
-		if ns, ok := o.(*v1.Namespace); ok {
-			names = append(names, ns.Name)
-		}
-	}
-	return names
-}
-
+// Individual Tests ------------------------------------------------------------
 func TestDryRunBehavior(t *testing.T) {
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -178,7 +228,11 @@ func TestDryRunBehavior(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(ns)
-	t.Logf("📥 Dry Run Initial State: %s Labels=%v", ns.Name, ns.Labels)
+
+	t.Log("\n🏷️  TEST: Dry Run Behavior")
+	t.Log("📦 Initial State:")
+	t.Logf("  ▸ Namespace: %s", ns.Name)
+	t.Logf("    - Labels: %v", ns.Labels)
 
 	cfg := Config{
 		DryRun:         true,
@@ -189,7 +243,9 @@ func TestDryRunBehavior(t *testing.T) {
 	processNamespaces(context.TODO(), nil, client, cfg)
 
 	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "dry-run-ns", metav1.GetOptions{})
-	t.Logf("📊 Dry Run Final State: %s Labels=%v", updatedNs.Name, updatedNs.Labels)
+	t.Log("\n📦 Final State:")
+	t.Logf("  ▸ Namespace: %s", updatedNs.Name)
+	t.Logf("    - Labels: %v", updatedNs.Labels)
 
 	assert.Empty(t, updatedNs.Labels["namespace-cleaner/delete-at"],
 		"Dry run should not modify labels")
@@ -207,7 +263,11 @@ func TestLabelParsingErrors(t *testing.T) {
 		},
 	}
 	client := fake.NewSimpleClientset(ns)
-	t.Logf("📥 Invalid Label Initial State: %s Labels=%v", ns.Name, ns.Labels)
+
+	t.Log("\n🏷️  TEST: Label Parsing Error Handling")
+	t.Log("📦 Initial State:")
+	t.Logf("  ▸ Namespace: %s", ns.Name)
+	t.Logf("    - Labels: %v", ns.Labels)
 
 	cfg := Config{
 		TestMode:       true,
@@ -216,7 +276,9 @@ func TestLabelParsingErrors(t *testing.T) {
 	processNamespaces(context.TODO(), nil, client, cfg)
 
 	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "invalid-label-ns", metav1.GetOptions{})
-	t.Logf("📊 Final State: %s Labels=%v", updatedNs.Name, updatedNs.Labels)
+	t.Log("\n📦 Final State:")
+	t.Logf("  ▸ Namespace: %s", updatedNs.Name)
+	t.Logf("    - Labels: %v", updatedNs.Labels)
 
 	assert.Empty(t, updatedNs.Labels["namespace-cleaner/delete-at"],
 		"Invalid label should be removed")
@@ -229,11 +291,17 @@ func TestValidNamespace(t *testing.T) {
 			Labels: map[string]string{
 				"app.kubernetes.io/part-of": "kubeflow-profile",
 			},
-			Annotations: map[string]string{"owner": "test@example.com"},
+			Annotations: map[string]string{
+				"owner": "test@example.com",
+			},
 		},
 	}
 	client := fake.NewSimpleClientset(ns)
-	t.Logf("📥 Valid Namespace Initial State: %s Labels=%v", ns.Name, ns.Labels)
+
+	t.Log("\n🏷️  TEST: Valid Namespace Handling")
+	t.Log("📦 Initial State:")
+	t.Logf("  ▸ Namespace: %s", ns.Name)
+	t.Logf("    - Labels: %v", ns.Labels)
 
 	cfg := Config{
 		TestMode:       true,
@@ -243,12 +311,15 @@ func TestValidNamespace(t *testing.T) {
 	processNamespaces(context.TODO(), nil, client, cfg)
 
 	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "valid-ns", metav1.GetOptions{})
-	t.Logf("📊 Final State: %s Labels=%v", updatedNs.Name, updatedNs.Labels)
+	t.Log("\n📦 Final State:")
+	t.Logf("  ▸ Namespace: %s", updatedNs.Name)
+	t.Logf("    - Labels: %v", updatedNs.Labels)
 
 	assert.Empty(t, updatedNs.Labels["namespace-cleaner/delete-at"],
 		"Valid namespace should not be labeled")
 }
 
+// Test Suite Execution --------------------------------------------------------
 func TestMainSuite(t *testing.T) {
 	suite.Run(t, new(NamespaceCleanerTestSuite))
 }
