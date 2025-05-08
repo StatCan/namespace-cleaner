@@ -1,6 +1,3 @@
-Here's the updated README with proper badge integration and documentation:
-
-```markdown
 # Kubernetes Namespace Cleaner
 ![Coverage](https://img.shields.io/badge/Coverage-46.8%25-red)
 
