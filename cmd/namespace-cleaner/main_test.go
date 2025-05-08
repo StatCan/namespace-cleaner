@@ -20,7 +20,6 @@ import (
 const (
 	labelDeleteAt     = "namespace-cleaner/delete-at"
 	ownerAnnotation   = "owner"
-	labelTimeLayout   = "2006-01-02"
 	testHeaderFormat  = "\n🏷️  TEST CASE: %s\n"
 	sectionHeader     = "📦 %s\n"
 	namespaceFormat   = "  ▸ Namespace: %s\n"
