@@ -1,4 +1,3 @@
----
 name: CI Pipeline
 
 on: [push, pull_request]
@@ -17,12 +16,12 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-      - name: Set up Python
+      - name: Lint YAML
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      - name: Lint YAML files
+      - name: Run yamllint
         run: |
           pip install yamllint
           yamllint .
@@ -32,15 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: "1.21"
 
-      - name: Run unit tests
+      - name: Run Unit Tests
         run: make test-unit
 
-      - name: Upload coverage to Codecov
+      - name: Upload Coverage
         uses: codecov/codecov-action@v3
         with:
           file: coverage.out
@@ -51,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up MicroK8s
+      - name: Setup MicroK8s
         run: |
           sudo snap install microk8s --classic
           sudo microk8s status --wait-ready
@@ -59,15 +58,17 @@ jobs:
           mkdir -p $HOME/.kube
           sudo microk8s kubectl config view --raw > $HOME/.kube/config
 
-      - name: Build and push test image
+      - name: Build Test Image
         run: |
           docker build -t localhost:32000/namespace-cleaner:test .
           docker push localhost:32000/namespace-cleaner:test
 
-      - name: Run integration tests
+      - name: Apply Test Manifests
         run: |
-          sudo microk8s kubectl apply -f ./test-manifests/
-          make test-integration
+          sudo microk8s kubectl apply -f ./manifests/
+
+      - name: Run Integration Tests
+        run: make test-integration
 
   build-push:
     runs-on: ubuntu-latest
@@ -78,20 +79,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Azure Container Registry
+      - name: Login to ACR
         uses: azure/docker-login@v1
         with:
           login-server: ${{ env.REGISTRY }}
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and Push Image
         uses: docker/build-push-action@v5
         with:
           tags: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           push: true
 
-      - name: Security scan with Trivy
+      - name: Security Scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}

@@ -1,12 +1,15 @@
 .PHONY: test-unit test-integration docker-build
 
 test-integration: docker-build
-	@echo "🚀 Focused Integration Test - Namespace Deletion"
-	@kind create cluster --image kindest/node:v1.27.3 --name ns-cleaner-test
-	@kind load docker-image namespace-cleaner:test --name ns-cleaner-test
-	@timeout 5m ./tests/integration-test.sh || (echo "❌ Test failed"; kind delete cluster --name ns-cleaner-test; exit 1)
-	@kind delete cluster --name ns-cleaner-test
-	@echo "✅ All tests passed"
+	@echo "🚀 Starting Integration Tests with MicroK8s"
+	@echo "📦 Building and pushing test image to MicroK8s registry"
+	@docker build -t localhost:32000/namespace-cleaner:test .
+	@docker push localhost:32000/namespace-cleaner:test
+	@echo "📄 Applying Kubernetes manifests"
+	@microk8s kubectl apply -f ./manifests/
+	@echo "🧪 Running integration test script"
+	@timeout 5m ./tests/integration-test.sh || (echo "❌ Test failed"; exit 1)
+	@echo "✅ All integration tests passed"
 
 test-unit:
 	@echo "=============================================="
