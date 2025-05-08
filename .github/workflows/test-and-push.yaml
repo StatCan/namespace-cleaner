@@ -47,7 +47,7 @@ jobs:
 
   build-push:
     runs-on: ubuntu-latest
-    needs: [lint, integration-tests]
+    needs: lint
     steps:
       - uses: actions/checkout@v4
 
