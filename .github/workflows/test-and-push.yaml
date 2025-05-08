@@ -56,12 +56,12 @@ jobs:
           sudo snap install microk8s --classic --channel=1.28/stable
           sudo microk8s status --wait-ready
           sudo microk8s enable dns registry
-          sudo microk8s kubectl config view --raw > $HOME/.kube/config
-          sudo chmod 600 $HOME/.kube/config
+          mkdir -p $HOME/.kube
+          sudo microk8s config > $HOME/.kube/config
           sudo chown -R $USER:$USER $HOME/.kube
           sudo usermod -a -G microk8s $USER
-          newgrp microk8s || true
-          sudo microk8s kubectl create namespace das || true
+          newgrp microk8s
+          sudo microk8s kubectl create namespace das
 
       - name: Build Test Image
         run: |
