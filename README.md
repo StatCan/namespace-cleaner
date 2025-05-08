@@ -1,4 +1,5 @@
 # Kubernetes Namespace Cleaner
+![Coverage](https://img.shields.io/badge/Coverage-46.8%25-red)
 
 ![Test Coverage](https://img.shields.io/badge/Coverage-46.8%25-yellow)
 
