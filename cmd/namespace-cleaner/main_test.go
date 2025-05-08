@@ -114,18 +114,35 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
+			// Initialize fake client with test namespaces
 			s.client = fake.NewSimpleClientset(tc.namespaces...)
+
+			// ✅ Log before state
+			beforeList, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
+			var beforeNames []string
+			for _, ns := range beforeList.Items {
+				beforeNames = append(beforeNames, ns.Name)
+			}
+			s.T().Logf("📦 Before processing: Namespaces = %v", beforeNames)
+
+			// Run the namespace cleaner logic
 			processNamespaces(s.ctx, nil, s.client, s.config)
+
+			// ✅ Log after state
+			afterList, _ := s.client.CoreV1().Namespaces().List(s.ctx, metav1.ListOptions{})
+			var afterNames []string
+			for _, ns := range afterList.Items {
+				afterNames = append(afterNames, ns.Name)
+			}
+			s.T().Logf("🗑️ After processing: Namespaces = %v", afterNames)
 
 			// Verify namespace states
 			for nsName, shouldHaveLabel := range tc.expectedLabels {
 				ns, err := s.client.CoreV1().Namespaces().Get(s.ctx, nsName, metav1.GetOptions{})
-
 				if tc.expectedDeletes > 0 && nsName == "expired-namespace" {
 					require.Error(s.T(), err, "Namespace should be deleted")
 					continue
 				}
-
 				require.NoError(s.T(), err)
 				assert.Equal(s.T(), shouldHaveLabel,
 					ns.Labels["namespace-cleaner/delete-at"] != "",
@@ -142,7 +159,6 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 					deletes++
 				}
 			}
-
 			assert.Equal(s.T(), tc.expectedPatches, patches, "Patch count mismatch")
 			assert.Equal(s.T(), tc.expectedDeletes, deletes, "Delete count mismatch")
 		})
@@ -169,7 +185,6 @@ func TestDryRunBehavior(t *testing.T) {
 		GracePeriod:    30,
 	}
 	processNamespaces(context.TODO(), nil, client, cfg)
-
 	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "dry-run-ns", metav1.GetOptions{})
 	assert.Empty(t, updatedNs.Labels["namespace-cleaner/delete-at"], "Dry run should not modify labels")
 }
@@ -193,7 +208,6 @@ func TestLabelParsingErrors(t *testing.T) {
 		AllowedDomains: []string{"example.com"},
 	}
 	processNamespaces(context.TODO(), nil, client, cfg)
-
 	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "invalid-label-ns", metav1.GetOptions{})
 	assert.Empty(t, updatedNs.Labels["namespace-cleaner/delete-at"], "Invalid label should be removed")
 }
@@ -219,7 +233,6 @@ func TestValidNamespace(t *testing.T) {
 		AllowedDomains: []string{"example.com"},
 	}
 	processNamespaces(context.TODO(), nil, client, cfg)
-
 	updatedNs, _ := client.CoreV1().Namespaces().Get(context.TODO(), "valid-ns", metav1.GetOptions{})
 	assert.Empty(t, updatedNs.Labels["namespace-cleaner/delete-at"], "Valid namespace should not be labeled")
 }

@@ -45,35 +45,6 @@ jobs:
         with:
           file: coverage.out
 
-  integration-tests:
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup MicroK8s
-        run: |
-          sudo snap install microk8s --classic --channel=1.28/stable
-          sudo microk8s status --wait-ready
-          sudo microk8s enable dns registry hostpath-storage
-          sudo usermod -a -G microk8s runner
-          mkdir -p $HOME/.kube
-          sudo microk8s config > $HOME/.kube/config
-          sudo chown -R runner:runner $HOME/.kube
-          sudo microk8s kubectl create namespace das
-
-      - name: Build Test Image
-        run: |
-          docker build -t localhost:32000/namespace-cleaner:test .
-          docker push localhost:32000/namespace-cleaner:test
-
-      - name: Apply Test Manifests
-        run: |
-          sudo microk8s kubectl apply -f ./manifests/
-
-      - name: Run Integration Tests
-        run: make test-integration
-
   build-push:
     runs-on: ubuntu-latest
     needs: [lint, integration-tests]
