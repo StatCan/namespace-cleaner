@@ -21,15 +21,15 @@ test-unit:
 		| sed 's/^/   ▶ /'
 
 	@echo "\n📊 Processing coverage data..."
-	@go tool cover -func=coverage-report/coverage.tmp -o=coverage-report/coverage.out
+	@go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out
 	@rm coverage-report/coverage.tmp
 
 	@echo "\n📈 Coverage summary:"
-	@cat coverage-report/coverage.out | awk '/total:/ {printf "    Total Coverage: %s\n", $$3}'
+	@awk '/total:/ {printf "    Total Coverage: %s\n", $$3}' coverage-report/coverage.out
 
-	@echo "\n🛡️  Generating coverage badge..."
-	@gobadge -filename=coverage-report/coverage.out -green=80 -yellow=60 -target=coverage-report/coverage.svg
-	@echo "✅ Coverage badge generated: coverage-report/coverage.svg"
+	@echo "\n🛡️  Updating README badge..."
+	@gobadge -filename=coverage-report/coverage.out -green=80 -yellow=60 -target=README.md
+	@echo "✅ Coverage badge updated in README.md"
 
 	@echo "\n✅ Unit tests completed at $(shell date)"
 	@echo "=============================================="

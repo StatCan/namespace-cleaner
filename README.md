@@ -1,7 +1,5 @@
 # Kubernetes Namespace Cleaner
 
-![Test Coverage](https://github.com/StatCan/namespace-cleaner/actions/artifacts/coverage-badge)
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/7f10d356-9312-4483-aea0-33aeef6880d9" alt="Namespace Cleaner Logo" width="400"/>
 </p>
