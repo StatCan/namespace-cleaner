@@ -1,9 +1,12 @@
 #!/bin/bash
 set -exo pipefail
 
-# Create single test namespace with explicit expiration
+# Export kubeconfig for all subsequent commands
+export KUBECONFIG=$HOME/.kube/config
+
+# Create test namespace
 EXPIRED_TIME=$(date -u +"%Y-%m-%d_%H-%M-%SZ" --date='-5 minutes')
-kubectl apply -f - <<EOF
+microk8s kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -15,29 +18,28 @@ metadata:
     owner: invalid-user@example.com
 EOF
 
-# Run cleaner with full debug output
+# Run cleaner with proper kubeconfig
 docker run --network host --rm \
+  -v $HOME/.kube:/root/.kube \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e KUBECONFIG=/root/.kube/config \
   -e DRY_RUN=false \
   -e TEST_MODE=true \
   -e DEBUG=true \
   -e ALLOWED_DOMAINS=example.com \
   -e TEST_USERS=valid-user@example.com \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  namespace-cleaner:test
+  localhost:32000/namespace-cleaner:test
 
-# Verify deletion with aggressive checks
+# Verify deletion
 for i in {1..10}; do
-  kubectl get ns test-expired || exit 0
+  if ! microk8s kubectl get ns test-expired; then
+    echo "✅ test-expired: Successfully deleted"
+    exit 0
+  fi
   echo "Waiting for deletion (attempt $i/10)..."
   sleep 10
 done
 
-# Final verification
-if kubectl get ns test-expired; then
-  echo "❌ Namespace still exists"
-  kubectl get ns test-expired -o yaml
-  exit 1
-fi
-
-echo "✅ test-expired: Successfully deleted"
-exit 0
+echo "❌ Namespace still exists"
+microk8s kubectl get ns test-expired -o yaml
+exit 1

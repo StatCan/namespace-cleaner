@@ -1,15 +1,13 @@
 .PHONY: test-unit test-integration docker-build
 
 test-integration: docker-build
-	@echo "🚀 Starting Integration Tests with MicroK8s"
-	@echo "📦 Building and pushing test image to MicroK8s registry"
-	@docker build -t localhost:32000/namespace-cleaner:test .
-	@docker push localhost:32000/namespace-cleaner:test
-	@echo "📄 Applying Kubernetes manifests"
-	@microk8s kubectl apply -f ./manifests/
-	@echo "🧪 Running integration test script"
-	@timeout 5m ./tests/integration-test.sh || (echo "❌ Test failed"; exit 1)
-	@echo "✅ All integration tests passed"
+    @echo "🚀 Starting Integration Tests with MicroK8s"
+    @echo "📦 Building and pushing test image..."
+    @docker build -t localhost:32000/namespace-cleaner:test .
+    @docker push localhost:32000/namespace-cleaner:test
+    @echo "🧪 Running integration tests..."
+    @timeout 5m ./tests/integration-test.sh || (echo "❌ Test failed"; exit 1)
+    @echo "✅ All integration tests passed"
 
 test-unit:
 	@echo "=============================================="
