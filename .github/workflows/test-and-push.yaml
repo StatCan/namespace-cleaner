@@ -59,6 +59,8 @@ jobs:
           mkdir -p $HOME/.kube
           sudo microk8s kubectl config view --raw > $HOME/.kube/config
           sudo microk8s kubectl create namespace das
+          sudo usermod -a -G microk8s runner
+          sudo chown -R runner ~/.kube
 
       - name: Build Test Image
         run: |
