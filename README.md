@@ -71,6 +71,7 @@ Our GitHub Actions workflow provides:
 ## Configuration
 ```yaml
 # configmap.yaml
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
