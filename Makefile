@@ -1,63 +1,67 @@
-.PHONY: test dry-run run stop clean clean-test build
+.PHONY: build test dry-run run stop clean test-unit docker-build
 
-# Local testing (no Azure, real execution)
-test: build
-	@echo "Running local test suite..."
-	kubectl apply \
-		-f tests/test-config.yaml \
-		-f tests/test-cases.yaml
-	kubectl run testpod \
-		--image bitnami/kubectl:latest \
-		--restart=Never \
-		--env DRY_RUN=false \
-		--env TEST_MODE=true \
-		-- ./namespace-cleaner
-	@echo "\nVerification:"
-	@kubectl get ns -l app.kubernetes.io/part-of=kubeflow-profile
-	@make clean-test
+# Build targets
+build: ## Build the Go binary
+	@echo "🛠️  Building executable..."
+	@cd cmd/namespace-cleaner && \
+	go build -o ../../bin/namespace-cleaner .
+	@echo "✅ Binary built: bin/namespace-cleaner"
 
-# Build Go binary
-build:
-	@echo "Building namespace-cleaner binary..."
-	go build -o namespace-cleaner ./cmd/namespace-cleaner
+docker-build: ## Build Docker image
+	@echo "🐳 Building Docker image..."
+	@echo "    Image tag: namespace-cleaner:test"
+	@echo "    Build context: $(shell pwd)"
+	@docker build -t namespace-cleaner:test . \
+		| sed 's/^/    🏗️  /'
+	@echo "✅ Docker build completed"
 
-# Deploy to production (with the Go binary)
-run: build
-	@echo "Deploying namespace cleaner..."
-	kubectl apply -f manifests/configmap.yaml \
-				  -f manifests/cronjob.yaml \
-				  -f manifests/serviceaccount.yaml \
-				  -f manifests/rbac.yaml
-	@echo "\nCronJob scheduled."
+# Test targets
+test-unit: ## Run unit tests with coverage
+	@echo "=============================================="
+	@echo "🚀 Starting unit tests at $(shell date)"
+	@echo "⚙️  Test configuration:"
+	@echo "    - Race detector: enabled"
+	@echo "    - Coverage mode: atomic"
+	@echo "    - Verbose output: maximum"
+	@echo "=============================================="
+	@mkdir -p coverage-report
+	@cd cmd/namespace-cleaner && \
+	go test -v -race -coverprofile=../../coverage-report/coverage.tmp -covermode=atomic . \
+		| sed 's/^/   ▶ /'
+	@go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out
+	@rm coverage-report/coverage.tmp
+	@awk '/total:/ {printf "\n📈 Coverage: %s\n", $$3}' coverage-report/coverage.out
+	@gobadge -filename=coverage-report/coverage.out -green=80 -yellow=60 -target=README.md
+	@echo "✅ Unit tests completed"
 
-# Dry-run mode
-dry-run:
-	@echo "Executing production dry-run (real Azure checks)"
-	kubectl apply -f tests/dry-run-config.yaml \
-				  -f manifests/serviceaccount.yaml \
-				  -f manifests/rbac.yaml \
-				  -f manifests/netpol.yaml \
-				  -f tests/job.yaml
+test: test-unit ## Run full test suite (currently same as unit tests)
+	@echo "\n🔍 Running integration tests..."
+	@kubectl apply -f tests/integration-setup.yaml
+	@./bin/namespace-cleaner -test-mode
+	@kubectl delete -f tests/integration-setup.yaml
+	@echo "✅ Integration tests completed"
 
-# Stop production deployment
-stop:
-	@echo "Stopping namespace cleaner..."
-	kubectl delete -f manifests/cronjob.yaml --ignore-not-found
-	@echo "Retaining netpol/configmap/serviceaccount/rbac for audit purposes."
+dry-run: build ## Run in dry-run mode
+	@echo "🌵 Starting dry run..."
+	@./bin/namespace-cleaner -dry-run
+	@echo "✅ Dry run completed"
 
-# Clean test artifacts
-clean-test:
-	@echo "Cleaning test resources..."
-	kubectl delete -f tests/test-config.yaml -f tests/test-cases.yaml --ignore-not-found
-	kubectl delete pod testpod --ignore-not-found
-	kubectl delete job namespace-cleaner-container-job --ignore-not-found
+# Deployment targets
+run: docker-build ## Deploy to production cluster
+	@echo "🚀 Deploying to production..."
+	@kubectl apply -f manifests/
+	@echo "✅ Deployment complete. CronJob running on cluster"
 
-# Full cleanup (including production)
-clean: clean-test
-	@echo "Cleaning production resources..."
-	kubectl delete -f manifests/configmap.yaml \
-				   -f manifests/cronjob.yaml \
-				   -f manifests/rbac.yaml \
-				   -f manifests/netpol.yaml \
-				   -f tests/job.yaml \
-				   -f manifests/serviceaccount.yaml --ignore-not-found
+stop: ## Stop the CronJob (keep configurations)
+	@echo "⏸️  Stopping CronJob..."
+	@kubectl delete cronjob namespace-cleaner --ignore-not-found
+	@echo "✅ CronJob stopped. Configurations retained"
+
+clean: stop ## Remove all resources
+	@echo "🧹 Cleaning up resources..."
+	@kubectl delete -f manifests/ --ignore-not-found
+	@rm -rf bin/ coverage-report/
+	@echo "✅ All resources cleaned"
+
+help: ## Display this help message
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)

@@ -2,29 +2,25 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: namespace-cleaner-container-job
+  name: namespace-cleaner-test-job
   namespace: das
-  labels:
-    app: namespace-cleaner
 spec:
   template:
-    metadata:
-      labels:
-        app: namespace-cleaner
     spec:
       serviceAccountName: namespace-cleaner
       containers:
-        - name: namespace-cleaner-container
-          image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:8b2fbb8021fa613e9f09932dc19291ecb746dc36
-          command: ["/usr/local/bin/namespace-cleaner"]
-          args: ["--dry-run=true"]
+        - name: test-container
+          image: namespace-cleaner:test
+          imagePullPolicy: Never
+          command: ["/namespace-cleaner"]
+          args: ["--dry-run=$(DRY_RUN)"]
           envFrom:
-            - secretRef:
-                name: microsoft-graph-api-secret
             - configMapRef:
-                name: namespace-cleaner-dry-run-config
-          resources:
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
+                name: namespace-cleaner-config
+          env:
+            - name: DRY_RUN
+              value: "false"
+            - name: TEST_MODE
+              value: "true"
       restartPolicy: Never
+  backoffLimit: 0
