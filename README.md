@@ -9,6 +9,7 @@ A Kubernetes CronJob that automatically identifies and cleans up namespaces tied
 
 ## Development Status
 [![CI Pipeline](https://github.com/StatCan/namespace-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/StatCan/namespace-cleaner/actions/workflows/ci.yml)
+
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/StatCan/namespace-cleaner)
 
 ## Overview
