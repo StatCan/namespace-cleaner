@@ -2,13 +2,12 @@
 ![Coverage](https://img.shields.io/badge/Coverage-46.8%25-red)
 
 <p align="center">
-  <img src="https://github.com/StatCan/namespace-cleaner/raw/main/docs/logo.png" alt="Namespace Cleaner Logo" width="400"/>
+  <img src="https://github.com/user-attachments/assets/7f10d356-9312-4483-aea0-33aeef6880d9" alt="Namespace Cleaner Logo" width="400"/>
 </p>
 
 A Kubernetes CronJob that automatically identifies and cleans up namespaces tied to deprovisioned Azure Entra ID (formerly Azure AD) users.
 
 ## Development Status
-[![CI Pipeline](https://github.com/StatCan/namespace-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/StatCan/namespace-cleaner/actions/workflows/ci.yml)
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/StatCan/namespace-cleaner)
 
