@@ -52,19 +52,15 @@ dry-run: _dry-run-setup ## Run dry-run using cluster job
 	@kubectl -n das delete -f tests/dry-run-job.yaml
 	@echo "✅ Dry run completed"
 
-_dry-run-setup: _ensure-namespace
+_dry-run-setup:
 	@echo "🔧 Setting up dry-run dependencies..."
-	@kubectl apply -f manifests/rbac.yaml -f manifests/serviceaccount.yaml -f manifests/netpol.yaml
-
-_ensure-namespace:
-	@if ! kubectl get namespace das &> /dev/null; then \
-		echo "🚨 Error: 'das' namespace does not exist!"; \
-		echo "Please create it first with: kubectl create namespace das"; \
-		exit 1; \
-	fi
+	@kubectl apply -f manifests/rbac.yaml \
+		-f manifests/serviceaccount.yaml \
+		-f manifests/netpol.yaml \
+		-f manifests/configmap.yaml
 
 # Deployment targets
-run: docker-build _ensure-namespace ## Deploy to production cluster
+run: docker-build ## Deploy to production cluster
 	@echo "🚀 Deploying to production..."
 	@kubectl apply -f manifests/
 	@echo "✅ Deployment complete. CronJob running on cluster"
