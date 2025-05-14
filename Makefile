@@ -41,9 +41,15 @@ test: test-unit ## Run full test suite (currently same as unit tests)
 	@kubectl delete -f tests/integration-setup.yaml
 	@echo "✅ Integration tests completed"
 
-dry-run: build ## Run in dry-run mode
-	@echo "🌵 Starting dry run..."
-	@./bin/namespace-cleaner -dry-run
+dry-run: build ## Run in dry-run mode using cluster credentials
+	@echo "🌵 Starting dry run with cluster credentials..."
+	@kubectl -n das run namespace-cleaner-dry-run \
+		-it \
+		--rm \
+		--restart=Never \
+		--image=artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:8b2fbb8021fa613e9f09932dc19291ecb746dc36 \
+		--env="DRY_RUN=true" \
+		--command -- /namespace-cleaner -dry-run
 	@echo "✅ Dry run completed"
 
 # Deployment targets
