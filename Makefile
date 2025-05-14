@@ -41,29 +41,10 @@ test: test-unit ## Run full test suite (currently same as unit tests)
 	@kubectl delete -f tests/integration-setup.yaml
 	@echo "✅ Integration tests completed"
 
-dry-run: build ## Run in dry-run mode using cluster credentials
-	@echo "🌵 Starting dry run with cluster credentials..."
-	@kubectl -n das apply -f - <<EOF
-	apiVersion: batch/v1
-	kind: Job
-	metadata:
-	  name: namespace-cleaner-dry-run
-	spec:
-	  ttlSecondsAfterFinished: 60
-	  template:
-	    spec:
-	      serviceAccountName: namespace-cleaner
-	      containers:
-	      - name: cleaner
-	        image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:3a3152257608d091cf9563ee0be19f203c2795f7
-	        command: ["/namespace-cleaner", "-dry-run"]
-	        envFrom:
-	        - secretRef:
-	            name: microsoft-graph-api-secret
-	        - configMapRef:
-	            name: namespace-cleaner-config
-	      restartPolicy: Never
-	EOF
+dry-run: ## Run dry-run using cluster job
+	@echo "🌵 Starting dry run..."
+	@kubectl -n das delete job namespace-cleaner-dry-run --ignore-not-found
+	@kubectl -n das apply -f tests/dry-run-job.yaml
 	@echo "🕒 Waiting for job to start..."
 	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=30s
 	@echo "📄 Pod logs:"
