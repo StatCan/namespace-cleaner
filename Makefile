@@ -41,37 +41,38 @@ test: test-unit ## Run full test suite (currently same as unit tests)
 	@kubectl delete -f tests/integration-setup.yaml
 	@echo "✅ Integration tests completed"
 
-dry-run: ## Run dry-run using cluster job
+# Dry-run targets
+dry-run: _dry-run-setup ## Run dry-run using cluster job
 	@echo "🌵 Starting dry run..."
-	@kubectl -n das delete job namespace-cleaner-dry-run --ignore-not-found
-	@kubectl apply -f manifests/netpol.yaml
-	@kubectl apply -f manifests/rbac.yaml
-	@kubectl apply -f manifests/serviceaccount.yaml
 	@kubectl -n das apply -f tests/dry-run-job.yaml
-	@echo "🕒 Waiting for job to start..."
-	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=30s
+	@echo "🕒 Waiting for job to start (up to 2 minutes)..."
+	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=120s
 	@echo "📄 Pod logs:"
-	@kubectl -n das logs -l job-name=namespace-cleaner-dry-run --follow
-	@kubectl -n das delete job namespace-cleaner-dry-run
-	@kubectl delete -f manifests/netpol.yaml
-	@kubectl delete -f manifests/rbac.yaml
-	@kubectl delete -f manifests/serviceaccount.yaml
+	@kubectl -n das logs -f -l job-name=namespace-cleaner-dry-run
+	@kubectl -n das delete -f tests/dry-run-job.yaml
 	@echo "✅ Dry run completed"
 
+_dry-run-setup: _ensure-namespace
+	@echo "🔧 Setting up dry-run dependencies..."
+	@kubectl apply -f manifests/rbac.yaml -f manifests/serviceaccount.yaml -f manifests/netpol.yaml
+
+_ensure-namespace:
+	@if ! kubectl get namespace das &> /dev/null; then \
+		echo "🚨 Error: 'das' namespace does not exist!"; \
+		echo "Please create it first with: kubectl create namespace das"; \
+		exit 1; \
+	fi
+
 # Deployment targets
-run: docker-build ## Deploy to production cluster
+run: docker-build _ensure-namespace ## Deploy to production cluster
 	@echo "🚀 Deploying to production..."
 	@kubectl apply -f manifests/
 	@echo "✅ Deployment complete. CronJob running on cluster"
 
-stop: ## Stop the CronJob (keep configurations)
-	@echo "⏸️  Stopping CronJob..."
-	@kubectl delete cronjob namespace-cleaner --ignore-not-found
-	@echo "✅ CronJob stopped. Configurations retained"
-
 clean: stop ## Remove all resources
 	@echo "🧹 Cleaning up resources..."
 	@kubectl delete -f manifests/ --ignore-not-found
+	@kubectl delete -f tests/dry-run-job.yaml --ignore-not-found
 	@rm -rf bin/ coverage-report/
 	@echo "✅ All resources cleaned"
 

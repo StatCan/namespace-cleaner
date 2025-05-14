@@ -1,12 +1,16 @@
----
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: namespace-cleaner-dry-run
   namespace: das
+  labels:
+    app: namespace-cleaner
 spec:
-  ttlSecondsAfterFinished: 60 # Auto-delete after 1 minute
+  ttlSecondsAfterFinished: 60
   template:
+    metadata:
+      labels:
+        app: namespace-cleaner
     spec:
       serviceAccountName: namespace-cleaner
       containers:
