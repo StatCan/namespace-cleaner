@@ -44,12 +44,18 @@ test: test-unit ## Run full test suite (currently same as unit tests)
 dry-run: ## Run dry-run using cluster job
 	@echo "🌵 Starting dry run..."
 	@kubectl -n das delete job namespace-cleaner-dry-run --ignore-not-found
+	@kubectl apply -f manifests/netpol.yaml
+	@kubectl apply -f manifests/rbac.yaml
+	@kubectl apply -f manifests/serviceaccount.yaml
 	@kubectl -n das apply -f tests/dry-run-job.yaml
 	@echo "🕒 Waiting for job to start..."
 	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=30s
 	@echo "📄 Pod logs:"
 	@kubectl -n das logs -l job-name=namespace-cleaner-dry-run --follow
 	@kubectl -n das delete job namespace-cleaner-dry-run
+	@kubectl delete -f manifests/netpol.yaml
+	@kubectl delete -f manifests/rbac.yaml
+	@kubectl delete -f manifests/serviceaccount.yaml
 	@echo "✅ Dry run completed"
 
 # Deployment targets
