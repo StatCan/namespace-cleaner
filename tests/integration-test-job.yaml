@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: namespace-cleaner-integration-test
+spec:
+  template:
+    spec:
+      containers:
+        - name: namespace-cleaner
+          image: namespace-cleaner:test
+          env:
+            - name: DRY_RUN
+              value: "true"
+            - name: LOG_LEVEL
+              value: "debug"
+      restartPolicy: Never
+  backoffLimit: 1
