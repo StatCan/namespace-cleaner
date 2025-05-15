@@ -22,4 +22,9 @@ spec:
                 name: microsoft-graph-api-secret
             - configMapRef:
                 name: namespace-cleaner-config
+          env:
+            - name: DRY_RUN
+              value: "true"
+            - name: TEST_MODE
+              value: "false"
       restartPolicy: Never

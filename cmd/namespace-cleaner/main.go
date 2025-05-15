@@ -91,7 +91,7 @@ func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceCl
 
 	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(
 		cred,
-		[]string{"https://graph.microsoft.com/.default"},
+		[]string{"https://graph.microsoft.com/.default "},
 	)
 	if err != nil {
 		log.Fatalf("Graph client creation failed: %v", err)
@@ -134,6 +134,7 @@ func userExists(ctx context.Context, cfg Config, client *msgraphsdk.GraphService
 
 	_, err := client.Users().ByUserId(email).Get(ctx, nil)
 	if err != nil {
+		// Check for structured Microsoft Graph "NotFound" error
 		if respErr, ok := err.(*odataerrors.ODataError); ok {
 			if mainError := respErr.GetErrorEscaped(); mainError != nil {
 				if code := mainError.GetCode(); code != nil && *code == "NotFound" {
@@ -141,6 +142,12 @@ func userExists(ctx context.Context, cfg Config, client *msgraphsdk.GraphService
 				}
 			}
 		}
+
+		// Fallback: look for "does not exist" in plain error text
+		if strings.Contains(err.Error(), "does not exist") {
+			return false
+		}
+
 		log.Printf("Error checking user %s: %v", email, err)
 		return false
 	}
@@ -165,7 +172,10 @@ func validDomain(email string, domains []string) bool {
 
 // processNamespaces labels or deletes namespaces based on owner existence and delete-at
 func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient, kube kubernetes.Interface, cfg Config) {
-	// 1) Add delete-at label to namespaces missing it
+	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).UTC().Format(labelTimeLayout)
+
+	// Phase 1: Add delete-at label to namespaces without it
+	log.Printf("[DEBUG] Phase 1: Looking for namespaces needing delete-at label...")
 	nsList, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/part-of=kubeflow-profile,!namespace-cleaner/delete-at",
 	})
@@ -173,29 +183,57 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		log.Fatalf("Error listing namespaces: %v", err)
 	}
 
-	// compute grace date
-	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).
-		UTC().Format(labelTimeLayout)
+	log.Printf("[DEBUG] Found %d matching namespaces", len(nsList.Items))
 
 	for _, ns := range nsList.Items {
 		email := ns.Annotations["owner"]
-		if !validDomain(email, cfg.AllowedDomains) {
-			log.Printf("Invalid domain: %s in ns %s", email, ns.Name)
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] Examining namespace: %s", ns.Name)
+			log.Printf("[DRY RUN] - LabelSelector match: YES")
+		}
+
+		if email == "" {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] - Owner annotation: MISSING")
+				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
+			}
 			continue
 		}
-		if !userExists(ctx, cfg, graph, email) {
-			log.Printf("Marking %s for deletion at %s", ns.Name, graceDate)
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] - Owner annotation: %s", email)
+		}
+
+		if !validDomain(email, cfg.AllowedDomains) {
 			if cfg.DryRun {
-				log.Printf("[DRY RUN] Would label %s with delete-at=%s", ns.Name, graceDate)
+				log.Printf("[DRY RUN] - Domain check: NO")
+				log.Printf("[DRY RUN] SKIPPED: Invalid domain for %s", email)
+			}
+			continue
+		}
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] - Domain check: YES")
+		}
+
+		exists := userExists(ctx, cfg, graph, email)
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] - User exists in AD: %v", exists)
+		}
+
+		if exists {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] SKIPPED: Owner still exists")
+			}
+		} else {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] ACTION: Would label with delete-at=%s", graceDate)
 			} else {
+				log.Printf("Marking %s for deletion at %s", ns.Name, graceDate)
 				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))
-				_, err = kube.CoreV1().Namespaces().Patch(
-					ctx,
-					ns.Name,
-					types.MergePatchType,
-					patch,
-					metav1.PatchOptions{},
-				)
+				_, err = kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 				if err != nil {
 					log.Printf("Error patching %s: %v", ns.Name, err)
 				}
@@ -203,7 +241,8 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 		}
 	}
 
-	// 2) Remove label or delete expired namespaces
+	// Phase 2: Delete expired namespaces or remove label if user reappeared
+	log.Printf("[DEBUG] Phase 2: Checking for expired namespaces...")
 	expired, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "namespace-cleaner/delete-at",
 	})
@@ -212,31 +251,52 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	}
 	today := time.Now().UTC()
 
+	log.Printf("[DEBUG] Found %d expired namespaces", len(expired.Items))
+
 	for _, ns := range expired.Items {
 		email := ns.Annotations["owner"]
-
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
-		// parse using UTC location
+
 		deletionDate, err := time.ParseInLocation(labelTimeLayout, labelValue, time.UTC)
 		if err != nil {
-			log.Printf("Failed to parse delete-at label %q: %v", labelValue, err)
-			// Remove invalid label
-			if !cfg.DryRun {
-				patch := []byte(`{"metadata":{"labels":{"namespace-cleaner/delete-at":null}}}`)
-				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
-				if err != nil {
-					log.Printf("Error removing invalid label: %v", err)
-				}
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] Namespace %s has invalid delete-at label: %q", ns.Name, labelValue)
 			}
 			continue
 		}
 
-		// if user reappeared, remove label
-		if userExists(ctx, cfg, graph, email) {
-			log.Printf("User restored, removing delete-at from %s", ns.Name)
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] Examining expired namespace: %s", ns.Name)
+			log.Printf("[DRY RUN] - Owner annotation: %s", email)
+			log.Printf("[DRY RUN] - Expiry date: %s", labelValue)
+			log.Printf("[DRY RUN] - Today: %s", today.Format(labelTimeLayout))
+		}
+
+		if email == "" {
 			if cfg.DryRun {
-				log.Printf("[DRY RUN] Would remove label from %s", ns.Name)
+				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
+			}
+			continue
+		}
+
+		if !validDomain(email, cfg.AllowedDomains) {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] SKIPPED: Invalid domain for %s", email)
+			}
+			continue
+		}
+
+		exists := userExists(ctx, cfg, graph, email)
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] - User exists in AD: %v", exists)
+		}
+
+		if exists {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] ACTION: Would remove delete-at label")
 			} else {
+				log.Printf("Removing delete-at label from %s", ns.Name)
 				patch := []byte(`{"metadata":{"labels":{"namespace-cleaner/delete-at":null}}}`)
 				_, err := kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 				if err != nil {
@@ -244,21 +304,16 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				}
 			}
 		} else if today.After(deletionDate) {
-			// Debug logging for time comparison
-			log.Printf("Deleting %s: deletionDate=%v, today=%v", ns.Name, deletionDate, today)
-
 			if cfg.DryRun {
-				log.Printf("[DRY RUN] Would delete %s", ns.Name)
+				log.Printf("[DRY RUN] ACTION: Would delete namespace")
 			} else {
-				// In test mode, remove finalizers first
+				log.Printf("Deleting namespace %s", ns.Name)
 				if cfg.TestMode {
 					nsCopy := ns.DeepCopy()
 					nsCopy.Finalizers = nil
 					_, err := kube.CoreV1().Namespaces().Update(ctx, nsCopy, metav1.UpdateOptions{})
 					if err != nil {
 						log.Printf("Error removing finalizers from %s: %v", ns.Name, err)
-					} else {
-						log.Printf("Finalizers removed from %s", ns.Name)
 					}
 				}
 
@@ -268,6 +323,12 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				} else {
 					log.Printf("Deletion initiated for %s", ns.Name)
 				}
+			}
+		} else {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] STATUS: Not yet expired")
+			} else {
+				log.Printf("Namespace %s not yet expired", ns.Name)
 			}
 		}
 	}
