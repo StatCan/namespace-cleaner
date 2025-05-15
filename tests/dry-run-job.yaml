@@ -15,7 +15,7 @@ spec:
       serviceAccountName: namespace-cleaner
       containers:
         - name: cleaner
-          image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:3a3152257608d091cf9563ee0be19f203c2795f7
+          image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:a3a53190abad15a731b8fbe1ff35268151d38d7d
           command: ["/namespace-cleaner", "-dry-run"]
           envFrom:
             - secretRef:

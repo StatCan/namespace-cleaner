@@ -174,6 +174,16 @@ func validDomain(email string, domains []string) bool {
 func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient, kube kubernetes.Interface, cfg Config) {
 	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).UTC().Format(labelTimeLayout)
 
+	// Stats counters
+	totalNamespaces := 0
+	toLabel := 0
+	toDelete := 0
+	toRemoveLabel := 0
+	invalidLabels := 0
+	skippedMissingOwner := 0
+	skippedInvalidDomain := 0
+	skippedExistingUser := 0
+
 	// Phase 1: Add delete-at label to namespaces without it
 	log.Printf("[DEBUG] Phase 1: Looking for namespaces needing delete-at label...")
 	nsList, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
@@ -184,6 +194,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	}
 
 	log.Printf("[DEBUG] Found %d matching namespaces", len(nsList.Items))
+	totalNamespaces += len(nsList.Items)
 
 	for _, ns := range nsList.Items {
 		email := ns.Annotations["owner"]
@@ -198,6 +209,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				log.Printf("[DRY RUN] - Owner annotation: MISSING")
 				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
 			}
+			skippedMissingOwner++
 			continue
 		}
 
@@ -210,6 +222,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				log.Printf("[DRY RUN] - Domain check: NO")
 				log.Printf("[DRY RUN] SKIPPED: Invalid domain for %s", email)
 			}
+			skippedInvalidDomain++
 			continue
 		}
 
@@ -227,6 +240,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] SKIPPED: Owner still exists")
 			}
+			skippedExistingUser++
 		} else {
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] ACTION: Would label with delete-at=%s", graceDate)
@@ -238,6 +252,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 					log.Printf("Error patching %s: %v", ns.Name, err)
 				}
 			}
+			toLabel++
 		}
 	}
 
@@ -252,6 +267,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	today := time.Now().UTC()
 
 	log.Printf("[DEBUG] Found %d expired namespaces", len(expired.Items))
+	totalNamespaces += len(expired.Items)
 
 	for _, ns := range expired.Items {
 		email := ns.Annotations["owner"]
@@ -262,6 +278,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] Namespace %s has invalid delete-at label: %q", ns.Name, labelValue)
 			}
+			invalidLabels++
 			continue
 		}
 
@@ -276,6 +293,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
 			}
+			skippedMissingOwner++
 			continue
 		}
 
@@ -283,6 +301,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] SKIPPED: Invalid domain for %s", email)
 			}
+			skippedInvalidDomain++
 			continue
 		}
 
@@ -303,6 +322,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 					log.Printf("Error removing label: %v", err)
 				}
 			}
+			toRemoveLabel++
 		} else if today.After(deletionDate) {
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] ACTION: Would delete namespace")
@@ -324,6 +344,7 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 					log.Printf("Deletion initiated for %s", ns.Name)
 				}
 			}
+			toDelete++
 		} else {
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] STATUS: Not yet expired")
@@ -331,5 +352,21 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				log.Printf("Namespace %s not yet expired", ns.Name)
 			}
 		}
+	}
+
+	// === [DRY RUN] Summary Table ===
+	if cfg.DryRun {
+		log.Printf("\n============================")
+		log.Printf("[DRY RUN] Summary")
+		log.Printf("----------------------------")
+		log.Printf("Namespaces checked:         %d", totalNamespaces)
+		log.Printf("Would label:                %d", toLabel)
+		log.Printf("Would delete:               %d", toDelete)
+		log.Printf("Would remove label:         %d", toRemoveLabel)
+		log.Printf("Invalid delete-at labels:   %d", invalidLabels)
+		log.Printf("Skipped (valid owner):      %d", skippedExistingUser)
+		log.Printf("Skipped (missing owner):    %d", skippedMissingOwner)
+		log.Printf("Skipped (invalid domain):   %d", skippedInvalidDomain)
+		log.Printf("============================")
 	}
 }
