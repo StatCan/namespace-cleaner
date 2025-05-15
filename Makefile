@@ -1,7 +1,7 @@
 .PHONY:	build test-unit	docker-build dry-run run stop clean	help test-integration _setup-kind-cluster _delete-kind-cluster
 
 test-integration: _setup-kind-cluster
-	@export	KUBECONFIG="$(shell	kind get kubeconfig-path --name=integration-test)"
+	@export	KUBECONFIG="$(shell	kind get kubeconfig-path integration-test)"
 	@echo "🧪 Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
@@ -24,9 +24,9 @@ _setup-kind-cluster:
 		exit 1; \
 	fi
 	@echo "🧹 Ensuring no previous integration-test	cluster	exists..."
-	@kind get clusters | grep -q integration-test && kind delete cluster integration-test || true
+	@kind get clusters | grep -q integration-test && kind delete cluster --name	integration-test || true
 	@echo "🏗️ Creating	new	Kind cluster: integration-test"
-	@kind create cluster integration-test --wait	60s
+	@kind create cluster --name integration-test --wait	60s
 	@kubectl cluster-info
 	@echo "✅ Kind cluster created"
 
