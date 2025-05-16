@@ -32,7 +32,7 @@ _setup-kind-cluster:
 
 _delete-kind-cluster:
 	@echo "🧼 Deleting Kind	cluster..."
-	@kind get clusters | grep -q integration-test && kind delete cluster integration-test || true
+	@kind get clusters | grep -q integration-test && kind delete cluster --name integration-test || true
 	@echo "✅ Kind cluster deleted"
 
 # Build	targets
