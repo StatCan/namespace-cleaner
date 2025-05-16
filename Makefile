@@ -7,11 +7,15 @@ test-integration: _setup-kind-cluster
 	@kubectl apply -f manifests/
 	@kubectl apply -f tests/integration-test-job.yaml
 
+	@echo "🔍 Checking pod status..."
+	@kubectl get pods -l job-name=namespace-cleaner-integration-test -o wide --watch &
+	@SLEEP_PID=$$!; sleep 10; kill $$SLEEP_PID  # Watch pods for 10 seconds
+
 	@echo "⏱️ Waiting for job to complete..."
-	@kubectl wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=120s || \
+	@kubectl wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=300s || \
 		(kubectl describe job/namespace-cleaner-integration-test && exit 1)
 
-	@echo "📋 Pod logs:"
+	@echo "📋 Final pod logs:"
 	@kubectl logs -l job-name=namespace-cleaner-integration-test
 
 	@echo "✅ Integration tests passed"
@@ -41,17 +45,12 @@ build: ## Build	the	Go binary
 	go build -o ../../bin/namespace-cleaner	.
 	@echo "✅ Binary		  built: bin/namespace-cleaner"
 
-docker-build: ## Build Docker image	and	load into Kind
+docker-build: ## Build Docker image and load into Kind
 	@echo "🐳 Building Docker image..."
-	@docker	build -t namespace-cleaner:test	. \
-		| sed 's/^/	  📦  /'
-	@echo "✅ Docker	   build completed"
-ifeq ($(shell docker node ls 2>/dev/null | grep	-v NAME	| wc -l), 0)
-	@echo "⚠️ No Docker	  Swarm	cluster	running	—	 skipping image	load into Kind"
-else
-	@echo "🚚 Loading image	  into Kind..."
-	@kind load docker-image	namespace-cleaner:test
-endif
+	@docker build -t namespace-cleaner:test . | sed 's/^/    📦  /'
+	@echo "🚚 Loading image into Kind..."
+	@kind load docker-image namespace-cleaner:test --name integration-test
+	@echo "✅ Docker build completed"
 
 # Test targets
 test-unit: ## Run unit tests with coverage
