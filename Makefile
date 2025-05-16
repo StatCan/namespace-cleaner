@@ -1,7 +1,7 @@
 .PHONY:	build test-unit	docker-build dry-run run stop clean	help test-integration _setup-kind-cluster _delete-kind-cluster
 
 test-integration: _setup-kind-cluster
-	@export	KUBECONFIG="$(shell	kind get kubeconfig-path integration-test)"
+	@export KUBECONFIG=$$HOME/.kube/kind-config-integration-test
 	@echo "🧪 Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
@@ -14,7 +14,6 @@ test-integration: _setup-kind-cluster
 	@echo "📋 Pod logs:"
 	@kubectl logs -l job-name=namespace-cleaner-integration-test
 
-	# Optional:	Add	assertions here	based on logs or state
 	@echo "✅ Integration tests passed"
 
 _setup-kind-cluster:
