@@ -5,7 +5,7 @@ on: [push, pull_request]
 
 env:
   REGISTRY: k8scc01covidacr.azurecr.io
-  GO_VERSION: 1.21
+  GO_VERSION: 1.24
 
 jobs:
   lint:
@@ -43,19 +43,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
-            ${{ runner.os }}-go-
-
-      - name: Clean Go module cache
-        run: go clean -modcache
 
       - name: Install gobadge
         run: go install github.com/AlexBeauchemin/gobadge@latest
