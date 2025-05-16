@@ -1,6 +1,6 @@
 module namespace-cleaner
 
-go 1.24.2
+go 1.24
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0

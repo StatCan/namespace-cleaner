@@ -5,7 +5,7 @@ on: [push, pull_request]
 
 env:
   REGISTRY: k8scc01covidacr.azurecr.io
-  GO_VERSION: 1.21
+  GO_VERSION: 1.24
 
 jobs:
   lint:
@@ -44,19 +44,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
-            ${{ runner.os }}-go-
-
-      - name: Clean Go module cache
-        run: go clean -modcache
-
       - name: Install gobadge
         run: go install github.com/AlexBeauchemin/gobadge@latest
 
@@ -79,6 +66,30 @@ jobs:
           git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Install Kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Run Integration Tests
+        run: |
+          make test-integration
 
   build-push:
     runs-on: ubuntu-latest
