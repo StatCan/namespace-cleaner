@@ -11,7 +11,7 @@ spec:
           image: namespace-cleaner:test
           env:
             - name: DRY_RUN
-              value: "true"
+              value: "false"
             - name: LOG_LEVEL
               value: "debug"
       restartPolicy: Never
