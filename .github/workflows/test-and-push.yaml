@@ -78,22 +78,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
-            ${{ runner.os }}-go-
-
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
 
       - name: Install Kind
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
 
@@ -104,11 +94,6 @@ jobs:
       - name: Run Integration Tests
         run: |
           make test-integration
-
-      - name: Cleanup Kind Cluster
-        if: always()
-        run: |
-          make _delete-kind-cluster
 
   build-push:
     runs-on: ubuntu-latest
