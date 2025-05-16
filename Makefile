@@ -2,22 +2,20 @@
 
 test-integration: _setup-kind-cluster
 	@export KUBECONFIG=$$HOME/.kube/kind-config-integration-test
+	@echo "🐳 Building and loading Docker image..."
+	@docker build -t namespace-cleaner:test .
+	@kind load docker-image namespace-cleaner:test --name integration-test
 	@echo "🧪 Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
 	@kubectl apply -f tests/integration-test-job.yaml
 
-	@echo "🔍 Checking pod status..."
-	@kubectl get pods -l job-name=namespace-cleaner-integration-test -o wide --watch &
-	@SLEEP_PID=$$!; sleep 10; kill $$SLEEP_PID  # Watch pods for 10 seconds
-
 	@echo "⏱️ Waiting for job to complete..."
 	@kubectl wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=300s || \
 		(kubectl describe job/namespace-cleaner-integration-test && exit 1)
 
-	@echo "📋 Final pod logs:"
+	@echo "📋 Pod logs:"
 	@kubectl logs -l job-name=namespace-cleaner-integration-test
-
 	@echo "✅ Integration tests passed"
 
 _setup-kind-cluster:

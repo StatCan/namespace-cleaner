@@ -87,10 +87,6 @@ jobs:
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
 
-      - name: Build Docker Image
-        run: |
-          make docker-build
-
       - name: Run Integration Tests
         run: |
           make test-integration
