@@ -93,7 +93,6 @@ _dry-run-setup:
 	@kubectl apply -f manifests/rbac.yaml \
 		-f manifests/serviceaccount.yaml \
 		-f manifests/netpol.yaml \
-		-f manifests/configmap.yaml \
 		-f tests/dry-run-config.yaml
 
 # Deployment target
