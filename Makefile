@@ -78,7 +78,6 @@ test-unit: ## Run unit tests with coverage
 
 dry-run: _dry-run-setup
 	@echo "🚧 Starting dry run..."
-	@kubectl create namespace das || true
 	@kubectl -n das apply -f tests/dry-run-job.yaml
 	@echo "⏱️ Waiting for job to start (up to 5 minutes)..."
 	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=300s || \
