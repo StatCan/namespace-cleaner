@@ -1,0 +1,26 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: namespace-cleaner-dry-run
+  namespace: das
+  labels:
+    app: namespace-cleaner
+spec:
+  ttlSecondsAfterFinished: 60
+  template:
+    metadata:
+      labels:
+        app: namespace-cleaner
+    spec:
+      serviceAccountName: namespace-cleaner
+      containers:
+        - name: cleaner
+          image: artifactory.cloud.statcan.ca/das-aaw-docker/namespace-cleaner:b6e48d75b149194c14d23c146affb0e9fdc68ffb
+          command: ["/namespace-cleaner", "-dry-run"]
+          envFrom:
+            - secretRef:
+                name: microsoft-graph-api-secret
+            - configMapRef:
+                name: namespace-cleaner-dry-run-config
+      restartPolicy: Never

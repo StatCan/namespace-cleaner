@@ -1,14 +1,20 @@
----
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: namespace-cleaner-allow-egress
+  name: namespace-cleaner-egress-entra
   namespace: das
 spec:
   podSelector:
     matchLabels:
       app: namespace-cleaner
-  egress:
-    - {}
   policyTypes:
     - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 40.126.0.0/18 # Entra ID public IP range — traffic might route through this depending on Azure's regional distribution
+        - ipBlock:
+            cidr: 20.190.0.0/16 # Microsoft Graph known range
+      ports:
+        - protocol: TCP
+          port: 443 # HTTPS traffic for token retrieval and Graph API calls
