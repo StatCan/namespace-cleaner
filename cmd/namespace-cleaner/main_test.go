@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -223,7 +222,7 @@ func (s *NamespaceCleanerTestSuite) TestProcessNamespaces() {
 // TestDryRunBehavior verifies that no modifications are made when DryRun is enabled.
 // Expected outcome: Namespace labels should remain unchanged after processing.
 func TestDryRunBehavior(t *testing.T) {
-	ns := &v1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dry-run-ns",
 			Labels: map[string]string{
@@ -259,7 +258,7 @@ func TestDryRunBehavior(t *testing.T) {
 // TestLabelParsingErrors validates handling of invalid timestamp formats in labels.
 // Expected outcome: Invalid labels should be removed from namespaces.
 func TestLabelParsingErrors(t *testing.T) {
-	ns := &v1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "invalid-label-ns",
 			Labels: map[string]string{
@@ -294,7 +293,7 @@ func TestLabelParsingErrors(t *testing.T) {
 // TestValidNamespace ensures valid namespaces with active users remain unmodified.
 // Expected outcome: No deletion labels added to valid namespaces.
 func TestValidNamespace(t *testing.T) {
-	ns := &v1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-ns",
 			Labels: map[string]string{

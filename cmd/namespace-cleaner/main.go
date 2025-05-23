@@ -36,6 +36,17 @@ const (
 )
 
 func main() {
+	/*
+		client id -
+		client secret -
+		tenant id -
+		dry run - simulates a run without actual modifications
+		test mode - mocks certain values for testing
+		allowed domains - allowed email domains for user validation
+		test users - list of emails to simulate test runs with
+		grace period - how many days until a namespace is marked stale
+	*/
+
 	cfg := Config{
 		ClientID:       os.Getenv("CLIENT_ID"),
 		ClientSecret:   os.Getenv("CLIENT_SECRET"),
@@ -47,32 +58,39 @@ func main() {
 		GracePeriod:    getGracePeriod(),
 	}
 
-	ctx := context.Background()
-	graphClient := initGraphClient(ctx, cfg)
+	graphClient := initGraphClient(cfg)
 	kubeClient, err := initKubeClient(nil)
 	if err != nil {
 		log.Fatalf("Failed to initialize Kubernetes client: %v", err)
 	}
 
-	processNamespaces(ctx, graphClient, kubeClient, cfg)
+	processNamespaces(context.Background(), graphClient, kubeClient, cfg)
 }
 
 // getGracePeriod reads GRACE_PERIOD env or defaults to 30 days
 func getGracePeriod() int {
 	val := os.Getenv("GRACE_PERIOD")
 	if val == "" {
+		log.Printf("GRACE_PERIOD empty. Defaulting to 30.")
 		return 30
 	}
 	var days int
-	_, err := fmt.Sscanf(val, "%d", &days)
-	if err != nil || days < 0 {
+	_, err := fmt.Sscanf(val, "%d", &days) // val: str -> days: int conversion
+
+	if err != nil {
+		log.Printf("Bad argument for GRACE_PERIOD. Defaulting to 0.")
 		return 0
 	}
+	if days < 0 {
+		log.Printf("Days cannot be negative. Defaulting to 0.")
+		return 0
+	}
+
 	return days
 }
 
 // initGraphClient initializes Microsoft Graph client (or mock in test mode)
-func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceClient {
+func initGraphClient(cfg Config) *msgraphsdk.GraphServiceClient {
 	if cfg.TestMode {
 		// Return mock client for tests
 		return &msgraphsdk.GraphServiceClient{}
@@ -93,6 +111,7 @@ func initGraphClient(ctx context.Context, cfg Config) *msgraphsdk.GraphServiceCl
 		cred,
 		[]string{"https://graph.microsoft.com/.default "},
 	)
+
 	if err != nil {
 		log.Fatalf("Graph client creation failed: %v", err)
 	}
@@ -151,6 +170,7 @@ func userExists(ctx context.Context, cfg Config, client *msgraphsdk.GraphService
 		log.Printf("Error checking user %s: %v", email, err)
 		return false
 	}
+
 	return true
 }
 
@@ -197,14 +217,8 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	totalNamespaces += len(nsList.Items)
 
 	for _, ns := range nsList.Items {
-		email := ns.Annotations["owner"]
-
-		if cfg.DryRun {
-			log.Printf("[DRY RUN] Examining namespace: %s", ns.Name)
-			log.Printf("[DRY RUN] - LabelSelector match: YES")
-		}
-
-		if email == "" {
+		email, found := ns.Annotations["owner"]
+		if !found {
 			if cfg.DryRun {
 				log.Printf("[DRY RUN] - Owner annotation: MISSING")
 				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
@@ -215,6 +229,11 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 
 		if cfg.DryRun {
 			log.Printf("[DRY RUN] - Owner annotation: %s", email)
+		}
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] Examining namespace: %s", ns.Name)
+			log.Printf("[DRY RUN] - LabelSelector match: YES")
 		}
 
 		if !validDomain(email, cfg.AllowedDomains) {
@@ -241,19 +260,23 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 				log.Printf("[DRY RUN] SKIPPED: Owner still exists")
 			}
 			skippedExistingUser++
-		} else {
-			if cfg.DryRun {
-				log.Printf("[DRY RUN] ACTION: Would label with delete-at=%s", graceDate)
-			} else {
-				log.Printf("Marking %s for deletion at %s", ns.Name, graceDate)
-				patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))
-				_, err = kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
-				if err != nil {
-					log.Printf("Error patching %s: %v", ns.Name, err)
-				}
-			}
-			toLabel++
+			continue
 		}
+
+		if cfg.DryRun {
+			log.Printf("[DRY RUN] ACTION: Would label with delete-at=%s", graceDate)
+		} else {
+			log.Printf("Marking %s for deletion at %s", ns.Name, graceDate)
+
+			patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"namespace-cleaner/delete-at":"%s"}}}`, graceDate))
+			_, err = kube.CoreV1().Namespaces().Patch(ctx, ns.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+			if err != nil {
+				log.Printf("Error patching %s: %v", ns.Name, err)
+			}
+		}
+
+		toLabel++
+
 	}
 
 	// Phase 2: Delete expired namespaces or remove label if user reappeared
@@ -270,7 +293,15 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 	totalNamespaces += len(expired.Items)
 
 	for _, ns := range expired.Items {
-		email := ns.Annotations["owner"]
+		email, found := ns.Annotations["owner"]
+		if !found {
+			if cfg.DryRun {
+				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
+			}
+			skippedMissingOwner++
+			continue
+		}
+
 		labelValue := ns.Labels["namespace-cleaner/delete-at"]
 
 		deletionDate, err := time.ParseInLocation(labelTimeLayout, labelValue, time.UTC)
@@ -287,14 +318,6 @@ func processNamespaces(ctx context.Context, graph *msgraphsdk.GraphServiceClient
 			log.Printf("[DRY RUN] - Owner annotation: %s", email)
 			log.Printf("[DRY RUN] - Expiry date: %s", labelValue)
 			log.Printf("[DRY RUN] - Today: %s", today.Format(labelTimeLayout))
-		}
-
-		if email == "" {
-			if cfg.DryRun {
-				log.Printf("[DRY RUN] SKIPPED: Missing 'owner' annotation")
-			}
-			skippedMissingOwner++
-			continue
 		}
 
 		if !validDomain(email, cfg.AllowedDomains) {
