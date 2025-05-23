@@ -12,10 +12,9 @@ spec:
   egress:
   - to:
     - ipBlock:
-        cidr: 40.126.0.0/18  # Entra ID
+        cidr: 40.126.0.0/18 # Entra ID public IP range — traffic might route through this depending on Azure's regional distribution
     - ipBlock:
-        cidr: 20.190.0.0/16  # Microsoft Graph known range
+        cidr: 20.190.0.0/16 # Microsoft Graph known range
     ports:
     - protocol: TCP
-      port: 443
-
+      port: 443 # HTTPS traffic for token retrieval and Graph API calls
