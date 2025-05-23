@@ -1,3 +1,6 @@
+first:
+	@echo "Please use an explicit command, e.g., 'make build' or 'make help'"
+
 .PHONY: build test-unit docker-build dry-run run stop clean help test-integration _setup-kind-cluster _delete-kind-cluster
 
 test-integration: _setup-kind-cluster
