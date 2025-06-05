@@ -80,16 +80,20 @@ test-integration: _setup-kind-cluster docker-build
 	@kubectl apply -f manifests/
 	@kubectl -n das run namespace-cleaner-integration-test \
 	  --image=namespace-cleaner:test \
-	  --restar=Never \
+	  --restart=Never \
 	  --env="DRY_RUN=false" \
-	  --env="LOG_LEVEL=debug"
+	  --env="LOG_LEVEL=debug" \
+	  --dry-run=client -o yaml | kubectl apply -f - # Create a pod and then apply it to ensure a consistent name
 
-	@echo "Waiting for job to complete..."
-	@kubectl -n das wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=300s || \
-		(kubectl -n das describe job/namespace-cleaner-integration-test && exit 1)
+	@echo "Waiting for pod to complete..."
+	# Get the actual pod name, as kubectl run can append random strings
+	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
+	kubectl -n das wait --for=condition=Succeeded pod/$$POD_NAME --timeout=300s || \
+		(kubectl -n das describe pod/$$POD_NAME && exit 1)
 
 	@echo "Pod logs:"
-	@kubectl logs -l job-name=namespace-cleaner-integration-test
+	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
+	kubectl -n das logs $$POD_NAME
 	@echo "Integration tests passed"
 
 _setup-kind-cluster:
