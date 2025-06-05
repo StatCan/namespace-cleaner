@@ -54,7 +54,7 @@ jobs:
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
-          file: coverage-report/coverage.out  # Updated path
+          file: coverage-report/coverage.out
 
       - name: Commit updated README
         if: github.ref == 'refs/heads/main' # Only run on main branch
