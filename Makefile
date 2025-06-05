@@ -80,13 +80,13 @@ test-integration: _setup-kind-cluster docker-build
 	@kubectl apply -f manifests/
 	@kubectl -n das run namespace-cleaner-integration-test \
 	  --image=namespace-cleaner:test \
-	  --restart=Never \
+	  --restar=Never \
 	  --env="DRY_RUN=false" \
 	  --env="LOG_LEVEL=debug"
 
 	@echo "Waiting for job to complete..."
-	@kubectl wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=300s || \
-		(kubectl describe job/namespace-cleaner-integration-test && exit 1)
+	@kubectl -n das wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=300s || \
+		(kubectl -n das describe job/namespace-cleaner-integration-test && exit 1)
 
 	@echo "Pod logs:"
 	@kubectl logs -l job-name=namespace-cleaner-integration-test
