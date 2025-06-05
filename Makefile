@@ -88,7 +88,7 @@ test-integration: _setup-kind-cluster docker-build
 	@echo "Waiting for pod to complete..."
 	# Get the actual pod name, as kubectl run can append random strings
 	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
-	kubectl -n das wait --for=condition=Succeeded pod/$$POD_NAME --timeout=300s || \
+	kubectl -n das wait --for=condition=Succeeded pod/$$POD_NAME --timeout=60s || \
 		(kubectl -n das describe pod/$$POD_NAME && exit 1)
 
 	@echo "Pod logs:"
