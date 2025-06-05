@@ -78,18 +78,31 @@ test-integration: _setup-kind-cluster docker-build
 	@echo "Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
+	# Create a pod with a consistent name
 	@kubectl -n das run namespace-cleaner-integration-test \
 	  --image=namespace-cleaner:test \
 	  --restart=Never \
 	  --env="DRY_RUN=false" \
 	  --env="LOG_LEVEL=debug" \
-	  --dry-run=client -o yaml | kubectl apply -f - # Create a pod and then apply it to ensure a consistent name
+	  --dry-run=client -o yaml | kubectl apply -f -
 
 	@echo "Waiting for pod to complete..."
-	# Get the actual pod name, as kubectl run can append random strings
+	# Get the actual pod name
 	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
-	kubectl -n das wait --for=condition=Succeeded pod/$$POD_NAME --timeout=60s || \
-		(kubectl -n das describe pod/$$POD_NAME && exit 1)
+	for i in $$(seq 1 60); do \
+	  STATUS=$$(kubectl -n das get pod $$POD_NAME -o jsonpath='{.status.phase}'); \
+	  if [ "$$STATUS" = "Succeeded" ]; then \
+	    echo "Pod $$POD_NAME completed successfully."; \
+	    break; \
+	  elif [ "$$STATUS" = "Failed" ]; then \
+	    echo "Pod $$POD_NAME failed."; \
+	    kubectl -n das describe pod/$$POD_NAME; \
+	    exit 1; \
+	  fi; \
+	  echo "Waiting for pod $$POD_NAME to complete... Current status: $$STATUS"; \
+	  sleep 5; \
+	done || \
+	(echo "Timeout waiting for pod $$POD_NAME to complete." && kubectl -n das describe pod/$$POD_NAME && exit 1)
 
 	@echo "Pod logs:"
 	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
