@@ -78,7 +78,12 @@ test-integration: _setup-kind-cluster docker-build
 	@echo "Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
-	@kubectl apply -f tests/integration-test-job.yaml
+	#@kubectl apply -f tests/integration-test-job.yaml
+	@kubectl run namespace-cleaner-integration-test \
+	  --image=namespace-cleaner:test \
+	  --restart=Never \
+	  --env="DRY_RUN=false" \
+	  --env="LOG_LEVEL=debug"
 
 	@echo "Waiting for job to complete..."
 	@kubectl wait --for=condition=complete job/namespace-cleaner-integration-test --timeout=300s || \
