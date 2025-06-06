@@ -16,6 +16,4 @@ spec:
           value: "trace"
         - name: VERBOSE
           value: "true"
-      args:
-        - "--v=6"
   restartPolicy: Never
