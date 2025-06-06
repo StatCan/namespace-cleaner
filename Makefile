@@ -89,14 +89,28 @@ test-integration: _setup-kind-cluster docker-build ## Run integration tests on K
 	@kubectl -n das get all,configmaps,serviceaccounts,clusterroles,clusterrolebindings
 
 	@echo "Creating integration test pod with verbose logging..."
-	@kubectl run namespace-cleaner-integration-test \
-		--namespace=das \
-		--image=namespace-cleaner:test \
-		--restart='Never' \
-		--env="DRY_RUN=false" \
-		--env="LOG_LEVEL=trace" \
-		--env="VERBOSE=true" \
-		-- --v=6
+	@cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: namespace-cleaner-integration-test
+  namespace: das
+spec:
+  serviceAccountName: namespace-cleaner
+  containers:
+  - name: cleaner
+    image: namespace-cleaner:test
+    env:
+    - name: DRY_RUN
+      value: "false"
+    - name: LOG_LEVEL
+      value: "trace"
+    - name: VERBOSE
+      value: "true"
+    args:
+    - "--v=6"
+  restartPolicy: Never
+EOF
 
 	# Describe pod for initial diagnostics
 	@echo "Describing pod to capture configuration:"
