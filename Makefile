@@ -93,7 +93,6 @@ test-integration: _setup-kind-cluster docker-build ## Run integration tests on K
 		--namespace=das \
 		--image=namespace-cleaner:test \
 		--restart='Never' \
-		--serviceaccount=namespace-cleaner \
 		--env="DRY_RUN=false" \
 		--env="LOG_LEVEL=trace" \
 		--env="VERBOSE=true" \
