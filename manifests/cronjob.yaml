@@ -7,6 +7,7 @@ metadata:
   labels:
     app: namespace-cleaner
 spec:
+  ttlSecondsAfterFinished: 128
   schedule: "0 0 * * *"
   jobTemplate:
     spec:
