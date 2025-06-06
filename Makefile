@@ -77,9 +77,11 @@ test-unit: ## Run unit tests with coverage
 
 test-integration: _setup-kind-cluster docker-build ## Run integration tests on Kind cluster
 	@export KUBECONFIG=$$HOME/.kube/kind-config-integration-test
-	@echo "Running integration tests..."
+	@echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
+
+	@echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Starting integration test pod..."
 	@kubectl -n das run namespace-cleaner-integration-test \
 	  --image=namespace-cleaner:test \
 	  --restart=Never \
@@ -87,27 +89,28 @@ test-integration: _setup-kind-cluster docker-build ## Run integration tests on K
 	  --env="LOG_LEVEL=debug" \
 	  --dry-run=client -o yaml | kubectl apply -f -
 
-	@echo "Waiting for pod to complete..."
+	@echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Waiting for pod to complete..."
 	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
 	for i in $$(seq 1 60); do \
 	  STATUS=$$(kubectl -n das get pod $$POD_NAME -o jsonpath='{.status.phase}'); \
+	  echo "[$$(date +'%H:%M:%S')] Pod $$POD_NAME status: $$STATUS"; \
 	  if [ "$$STATUS" = "Succeeded" ]; then \
-	    echo "Pod $$POD_NAME completed successfully."; \
+	    echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Pod $$POD_NAME completed successfully."; \
 	    break; \
 	  elif [ "$$STATUS" = "Failed" ]; then \
-	    echo "Pod $$POD_NAME failed."; \
+	    echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Pod $$POD_NAME failed."; \
 	    kubectl -n das describe pod/$$POD_NAME; \
 	    exit 1; \
 	  fi; \
-	  echo "Waiting for pod $$POD_NAME to complete... Current status: $$STATUS"; \
 	  sleep 5; \
 	done || \
-	(echo "Timeout waiting for pod $$POD_NAME to complete." && kubectl -n das describe pod/$$POD_NAME && exit 1)
+	(echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Timeout waiting for pod $$POD_NAME to complete." && kubectl -n das describe pod/$$POD_NAME && exit 1)
 
-	@echo "Pod logs:"
+	@echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Pod logs:"
 	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
-	kubectl -n das logs $$POD_NAME
-	@echo "Integration tests passed"
+	kubectl -n das logs --timestamps $$POD_NAME
+
+	@echo "[$$(date +'%Y-%m-%d %H:%M:%S')] Integration tests passed"
 
 dry-run: _dry-run-setup ## Run dry-run mode on real cluster
 	@echo "Starting dry run..."
