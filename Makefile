@@ -87,7 +87,7 @@ test-integration: _setup-kind-cluster docker-build ## Run integration tests on K
 
 	# Apply integration test pod manifest
 	@echo "Creating integration test pod..."
-	@kubectl apply -f test/integration-test-pod.yaml -n das
+	@kubectl apply -f tests/integration-test-pod.yaml -n das
 
 	# Verify pod spec
 	@echo "Verifying pod configuration..."
