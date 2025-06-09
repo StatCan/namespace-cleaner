@@ -21,7 +21,18 @@ var (
 	NewKubeClient  = newKubeClient
 )
 
-// UserExists is a variable pointing to the user existence checker function
+// UserExists is a function variable to check if a user exists in Azure AD.
+//
+// It points to the defaultUserExists implementation by default, but can be
+// overridden in unit tests to avoid real calls to Microsoft Graph.
+//
+// This enables simple function-level dependency injection for mocking behavior
+// without introducing interfaces or rewriting the call sites.
+//
+// Example test override:
+//     clients.UserExists = func(ctx context.Context, cfg *config.Config, client *msgraphsdk.GraphServiceClient, email string) bool {
+//         return true // or false depending on the test case
+//     }
 var UserExists = defaultUserExists
 
 func newGraphClient(cfg *config.Config) *msgraphsdk.GraphServiceClient {
