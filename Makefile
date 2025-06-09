@@ -93,7 +93,8 @@ test-integration: _setup-kind-cluster docker-build ## Run integration tests on K
 	@echo "Verifying NetPol..."
 	@kubectl -n das get netpol
 	@echo "Verifying RBAC..."
-	@kubectl -n das get rbac
+	@kubectl -n das get rolebindings.rbac.authorization.k8s.io 
+	@kubectl -n das get roles.rbac.authorization.k8s.io
 	@echo "Verifying ServiceAccount..."
 	@kubectl -n das get serviceaccount
 
