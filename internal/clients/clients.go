@@ -21,6 +21,9 @@ var (
 	NewKubeClient  = newKubeClient
 )
 
+// UserExists is a variable pointing to the user existence checker function
+var UserExists = defaultUserExists
+
 func newGraphClient(cfg *config.Config) *msgraphsdk.GraphServiceClient {
 	if cfg.TestMode {
 		return &msgraphsdk.GraphServiceClient{}
@@ -70,7 +73,7 @@ func newKubeClient() kubernetes.Interface {
 }
 
 // defaultUserExists checks if a user exists in Azure AD
-func UserExists(ctx context.Context, cfg *config.Config, client *msgraphsdk.GraphServiceClient, email string) bool {
+func defaultUserExists(ctx context.Context, cfg *config.Config, client *msgraphsdk.GraphServiceClient, email string) bool {
 	if cfg.TestMode {
 		for _, u := range cfg.TestUsers {
 			if u == email {
