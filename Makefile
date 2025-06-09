@@ -84,6 +84,18 @@ test-integration: _setup-kind-cluster docker-build ## Run integration tests on K
 	# Apply RBAC and configmap
 	@echo "Applying manifests..."
 	@kubectl apply -f manifests/
+	
+	# Check outcome
+	@echo "Verifying ConfigMap..."
+	@kubectl -n das get cm
+	@echo "Verifying CronJob..."
+	@kubectl -n das get cronjob
+	@echo "Verifying NetPol..."
+	@kubectl -n das get netpol
+	@echo "Verifying RBAC..."
+	@kubectl -n das get rbac
+	@echo "Verifying ServiceAccount..."
+	@kubectl -n das get serviceaccount
 
 	# Apply integration test pod manifest
 	@echo "Creating integration test pod..."
