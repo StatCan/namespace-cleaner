@@ -5,7 +5,7 @@
 first:
 	@echo "Please use an explicit command, e.g., 'make build' or 'make help'"
 
-.PHONY: first build test-unit docker-build image dry-run run stop clean help test-integration _setup-kind-cluster _delete-kind-cluster
+.PHONY: build test-unit docker-build image dry-run run stop clean help test-integration _setup-kind-cluster _delete-kind-cluster
 
 # Build targets
 build: ## Build the Go binary

@@ -62,8 +62,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0 # Required for branch detection
+          ref: ${{ github.head_ref || github.ref_name }} # Handle PR branches
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -82,7 +82,7 @@ jobs:
           file: coverage-report/coverage.out
 
       - name: Commit updated README
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' # Only run on main branch
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
