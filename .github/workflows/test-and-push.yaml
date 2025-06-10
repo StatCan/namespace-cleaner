@@ -10,9 +10,14 @@ env:
   REGISTRY: k8scc01covidacr.azurecr.io
 
 jobs:
-  lint:
+  deploy-namespace-cleaner:  # Consolidated job for all deployment-related tasks
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
     steps:
+      # --- Linting and Setup ---
       - uses: actions/checkout@v4
 
       - name: Lint Dockerfile
@@ -30,14 +35,7 @@ jobs:
           pip install yamllint
           yamllint .
 
-  build:
-    runs-on: ubuntu-latest
-    needs: lint
-    outputs:
-      image-tarball: namespace-cleaner.tar
-    steps:
-      - uses: actions/checkout@v4
-
+      # --- Build Docker Image ---
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -45,27 +43,7 @@ jobs:
         run: |
           docker build -t ${{ env.IMAGE_NAME }} .
 
-      - name: Save Docker Image to Tarball
-        run: docker save -o namespace-cleaner.tar ${{ env.IMAGE_NAME }}
-
-      - name: Upload Image Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-tarball
-          path: namespace-cleaner.tar
-
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for branch detection
-          ref: ${{ github.head_ref || github.ref_name }} # Handle PR branches
-
+      # --- Unit Tests ---
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
@@ -83,7 +61,7 @@ jobs:
           file: coverage-report/coverage.out
 
       - name: Commit updated README
-        if: github.ref == 'refs/heads/main' # Only run on main branch
+        if: github.ref == 'refs/heads/main'  # Only run on main branch
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
@@ -94,14 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download Docker Image
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tarball
-
-      - name: Load Docker Image
-        run: docker load -i namespace-cleaner.tar
-
+      # --- Integration Tests with Kind ---
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
 
@@ -120,20 +91,7 @@ jobs:
       - name: Run Integration Tests
         run: make test-integration
 
-  scan:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Docker Image
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tarball
-
-      - name: Load Docker Image
-        run: docker load -i namespace-cleaner.tar
-
+      # --- Security Scan ---
       - name: Run Trivy Security Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -143,20 +101,7 @@ jobs:
           exit-code: 1
           format: table
 
-  push:
-    runs-on: ubuntu-latest
-    needs: [build, test, scan]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Docker Image
-        uses: actions/download-artifact@v4
-        with:
-          name: image-tarball
-
-      - name: Load Docker Image
-        run: docker load -i namespace-cleaner.tar
-
+      # --- Push Image to ACR ---
       - name: Login to ACR
         uses: azure/docker-login@v1
         with:
