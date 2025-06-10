@@ -6,6 +6,7 @@ env:
   GO_VERSION: 1.24
   KIND_VERSION: v0.27.0
   IMAGE_NAME: namespace-cleaner:test
+  REGISTRY: k8scc01covidacr.azurecr.io
 
 jobs:
   lint:
@@ -18,7 +19,7 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-      - name: Setup Python 3.10
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
@@ -28,8 +29,33 @@ jobs:
           pip install yamllint
           yamllint .
 
-  unit-tests:
+  build:
     runs-on: ubuntu-latest
+    needs: lint
+    outputs:
+      image-tarball: namespace-cleaner.tar
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }} .
+
+      - name: Save Docker Image to Tarball
+        run: docker save -o namespace-cleaner.tar ${{ env.IMAGE_NAME }}
+
+      - name: Upload Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-tarball
+          path: namespace-cleaner.tar
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
     permissions:
       contents: write
       pull-requests: write
@@ -67,25 +93,47 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-test-and-scan:
+      - name: Download Docker Image
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tarball
+
+      - name: Load Docker Image
+        run: docker load -i namespace-cleaner.tar
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Install Kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/${{ env.KIND_VERSION }}/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Create Kind Cluster
+        run: kind create cluster
+
+      - name: Load Image into Kind
+        run: kind load docker-image ${{ env.IMAGE_NAME }}
+
+      - name: Run Integration Tests
+        run: make test-integration
+
+  scan:
     runs-on: ubuntu-latest
-    needs: [unit-tests]
+    needs: build
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      - name: Download Docker Image
+        uses: actions/download-artifact@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
+          name: image-tarball
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Load Docker Image
+        run: docker load -i namespace-cleaner.tar
 
-      - name: Build Docker Image Locally
-        run: |
-          docker build -t ${{ env.IMAGE_NAME }} .
-
-      - name: Run Trivy Security Scan (Local)
+      - name: Run Trivy Security Scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.IMAGE_NAME }}
@@ -94,20 +142,28 @@ jobs:
           exit-code: 1
           format: table
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
+  push:
+    runs-on: ubuntu-latest
+    needs: [build, test, scan]
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Install Kind
+      - name: Download Docker Image
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tarball
+
+      - name: Load Docker Image
+        run: docker load -i namespace-cleaner.tar
+
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Tag and Push Image
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/${{  env.KIND_VERSION }}/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
-
-      - name: Create Kind Cluster
-        run: kind create cluster
-
-      - name: Load Docker Image into Kind
-        run: kind load docker-image ${{ env.IMAGE_NAME }}
-
-      - name: Run Integration Tests
-        run: make test-integration
+          docker tag ${{ env.IMAGE_NAME }} ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
