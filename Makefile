@@ -1,12 +1,12 @@
 # Makefile for namespace-cleaner
-# Version: 2.0
+# Version: 2.1
 # Description: Build, test, and deploy namespace-cleaner
 
 # Default target
 first:
 	@echo "Please use an explicit command, e.g., 'make build' or 'make help'"
 
-.PHONY: build test-unit docker-build dry-run run stop clean help test-integration _setup-kind-cluster _delete-kind-cluster
+.PHONY: first build test-unit docker-build image dry-run run stop clean help test-integration _setup-kind-cluster _delete-kind-cluster
 
 # Build targets
 build: ## Build the Go binary
@@ -16,12 +16,14 @@ build: ## Build the Go binary
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../../bin/namespace-cleaner .
 	@echo "Binary built: bin/namespace-cleaner"
 
-docker-build: ## Build Docker image and load into Kind
+image: ## Build Docker image
 	@echo "Building Docker image..."
 	@docker build -t namespace-cleaner:test . | sed 's/^/     /'
+
+docker-build: image ## Build Docker image and load into Kind
 	@echo "Loading image into Kind..."
 	@kind load docker-image namespace-cleaner:test --name integration-test
-	@echo "Docker build completed"
+	@echo "Docker image loaded into Kind"
 
 # Test targets
 test-unit: ## Run unit tests with coverage
@@ -33,35 +35,35 @@ test-unit: ## Run unit tests with coverage
 	@echo "	  - Verbose output: maximum"
 	@echo "=============================================="
 	@mkdir -p coverage-report
-	
+
 	# Test internal packages
 	@cd internal/cleaner && \
 	go test -v -race -coverprofile=../../coverage-report/cleaner-coverage.tmp -covermode=atomic . \
 		| sed 's/^/	 ▶ cleaner: /'
-	
+
 	@cd internal/clients && \
 	go test -v -race -coverprofile=../../coverage-report/clients-coverage.tmp -covermode=atomic . \
 		| sed 's/^/	 ▶ clients: /'
-	
+
 	@cd internal/config && \
 	go test -v -race -coverprofile=../../coverage-report/config-coverage.tmp -covermode=atomic . \
 		| sed 's/^/	 ▶ config: /'
-	
+
 	@cd pkg/stats && \
 	go test -v -race -coverprofile=../../coverage-report/stats-coverage.tmp -covermode=atomic . \
 		| sed 's/^/	 ▶ stats: /'
-	
+
 	# Test main package
 	@cd cmd/namespace-cleaner && \
 	go test -v -race -coverprofile=../../coverage-report/main-coverage.tmp -covermode=atomic . \
 		| sed 's/^/	 ▶ main: /'
-	
+
 	# Combine coverage reports
 	@echo "mode: atomic" > coverage-report/coverage.tmp
 	@find coverage-report -name '*-coverage.tmp' -exec grep -h -v "mode: atomic" {} >> coverage-report/coverage.tmp \;
 	@go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out
 	@rm -f coverage-report/*-coverage.tmp
-	
+
 	# Generate coverage report
 	@awk '/total:/ {printf "\nCoverage: %s\n", $$3}' coverage-report/coverage.out
 	@if command -v gobadge >/dev/null 2>&1; then \
@@ -73,12 +75,11 @@ test-unit: ## Run unit tests with coverage
 
 	@echo "Unit tests completed"
 
-test-integration: _setup-kind-cluster docker-build
+test-integration: _setup-kind-cluster docker-build ## Run integration tests on Kind cluster
 	@export KUBECONFIG=$$HOME/.kube/kind-config-integration-test
 	@echo "Running integration tests..."
 	@kubectl create namespace das || true
 	@kubectl apply -f manifests/
-	# Create a pod with a consistent name
 	@kubectl -n das run namespace-cleaner-integration-test \
 	  --image=namespace-cleaner:test \
 	  --restart=Never \
@@ -87,7 +88,6 @@ test-integration: _setup-kind-cluster docker-build
 	  --dry-run=client -o yaml | kubectl apply -f -
 
 	@echo "Waiting for pod to complete..."
-	# Get the actual pod name
 	@POD_NAME=$$(kubectl -n das get pod -l run=namespace-cleaner-integration-test -o jsonpath='{.items[0].metadata.name}') && \
 	for i in $$(seq 1 60); do \
 	  STATUS=$$(kubectl -n das get pod $$POD_NAME -o jsonpath='{.status.phase}'); \
@@ -109,6 +109,23 @@ test-integration: _setup-kind-cluster docker-build
 	kubectl -n das logs $$POD_NAME
 	@echo "Integration tests passed"
 
+dry-run: _dry-run-setup ## Run dry-run mode on real cluster
+	@echo "Starting dry run..."
+	@kubectl -n das apply -f tests/dry-run-job.yaml
+	@echo "Waiting for job to start (up to 5 minutes)..."
+	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=300s || \
+		(echo "Pod did not become ready"; exit 1)
+	@echo "Pod logs:"
+	@kubectl -n das logs -f -l job-name=namespace-cleaner-dry-run
+	@kubectl -n das delete -f tests/dry-run-job.yaml || true
+	@$(MAKE) stop
+	@echo "Dry run completed"
+
+_dry-run-setup:
+	@echo "Setting up dry-run dependencies on real cluster..."
+	@kubectl apply -f manifests/
+	@kubectl apply -f tests/dry-run-config.yaml
+
 _setup-kind-cluster:
 	@echo "Setting up Kind cluster..."
 	@if ! command -v kind >/dev/null; then \
@@ -126,26 +143,6 @@ _delete-kind-cluster:
 	@echo "Deleting Kind cluster..."
 	@kind get clusters | grep -q integration-test && kind delete cluster --name integration-test || true
 	@echo "Kind cluster deleted"
-
-# Dry-run target
-dry-run: _dry-run-setup
-	@echo "Starting dry run..."
-	@kubectl -n das apply -f tests/dry-run-job.yaml
-	@echo "Waiting for job to start (up to 5 minutes)..."
-	@kubectl -n das wait --for=condition=ready pod -l job-name=namespace-cleaner-dry-run --timeout=300s || \
-		(echo "Pod did not become ready"; exit 1)
-	@echo "Pod logs:"
-	@kubectl -n das logs -f -l job-name=namespace-cleaner-dry-run
-	@kubectl -n das delete -f tests/dry-run-job.yaml || true
-	@$(MAKE) stop
-	@echo "Dry run completed"
-
-_dry-run-setup:
-	@echo "Setting up dry-run dependencies..."
-	@kubectl apply -f manifests/rbac.yaml \
-		-f manifests/serviceaccount.yaml \
-		-f manifests/netpol.yaml \
-		-f tests/dry-run-config.yaml
 
 # Deployment target
 run: ## Deploy to production cluster
@@ -174,4 +171,4 @@ clean: stop ## Remove all resources
 # Help target
 help: ## Display this help message
 	@echo "Available targets:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
