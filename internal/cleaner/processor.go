@@ -38,7 +38,7 @@ func ProcessNamespaces(
 	processPhase1(ctx, cleaner, graph, kube, cfg, graceDate, stats)
 
 	// Phase 2: Process labeled namespaces
-	processPhase2(ctx, cleaner, graph, kube, cfg, stats)
+	processPhase2(ctx, cleaner, graph, kube, cfg, now, stats)
 
 	return stats
 }
@@ -71,6 +71,7 @@ func processPhase2(
 	graph *msgraphsdk.GraphServiceClient,
 	kube kubernetes.Interface,
 	cfg *config.Config,
+	now time.Time,
 	stats *stats.Stats,
 ) {
 	labeledNs, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
