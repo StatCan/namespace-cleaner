@@ -110,7 +110,7 @@ func TestProcessLabeledNamespace(t *testing.T) {
 	}
 }
 
-ffunc TestProcessNamespaces(t *testing.T) {
+func TestProcessNamespaces(t *testing.T) {
 	// Set fixed current time for test
 	now := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)
 	pastDate := now.Add(-24 * time.Hour).Format(labelTimeLayout)
