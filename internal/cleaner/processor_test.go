@@ -165,7 +165,7 @@ func TestProcessNamespaces(t *testing.T) {
 		GracePeriod:    30,
 	}
 
-	stats := cleaner.ProcessNamespaces(
+	stats := ProcessNamespaces(
 		context.TODO(),
 		cleaner,
 		nil, // graph client
