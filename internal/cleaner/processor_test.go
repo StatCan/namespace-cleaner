@@ -150,7 +150,7 @@ func TestProcessNamespaces(t *testing.T) {
 			},
 			Labels: map[string]string{
 				labelKey: futureDate,
-				"app.kubeflow.org/part-of": "kubeflow-profile",
+				"app.kubeflow.org/part-of": "kubeflow-boo",
 			},
 		},
 	}
