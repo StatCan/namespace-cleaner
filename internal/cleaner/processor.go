@@ -26,7 +26,7 @@ func ProcessNamespaces(
 ) *stats.Stats {
 	stats := &stats.Stats{}
 
-	_, err := kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	_, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Printf("Error listing namespaces: %v", err)
 		return stats
@@ -77,13 +77,12 @@ func processPhase2(
 		LabelSelector: labelKey,
 	})
 	if err != nil {
-		log.Fatalf("Error listing labeled namespaces: %v", err)
+		log.Printf("Error listing labeled namespaces: %v", err) 
 	}
 
-	today := time.Now().UTC()
 	for _, ns := range labeledNs.Items {
 		stats.IncTotal()
-		processLabeledNamespace(ctx, cleaner, graph, &ns, cfg, today, stats)
+		processLabeledNamespace(ctx, cleaner, graph, &ns, cfg, now, stats)
 	}
 }
 
@@ -166,7 +165,7 @@ func processLabeledNamespace(
 			stats.IncDeleted()
 		}
 	}
-	if err := cleaner.DeleteNamespace(ctx, ns.Name, config.TestMode); err != nil {
+	if err := cleaner.DeleteNamespace(ctx, ns.Name, cfg.TestMode); err != nil {
 		log.Printf("Error deleting namespace %s: %v", ns.Name, err)
 	}
 }
