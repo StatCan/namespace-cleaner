@@ -60,6 +60,9 @@ func (c *Cleaner) RemoveLabel(ctx context.Context, nsName string) error {
 	_, err := c.kubeClient.CoreV1().Namespaces().Patch(
 		ctx, nsName, types.MergePatchType, patch, metav1.PatchOptions{},
 	)
+	if err != nil {
+		log.Printf("Error removing label from %s: %v", nsName, err)
+	}
 	return err
 }
 
