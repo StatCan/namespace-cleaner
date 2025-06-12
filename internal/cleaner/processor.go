@@ -26,12 +26,6 @@ func ProcessNamespaces(
 ) *stats.Stats {
 	stats := &stats.Stats{}
 
-	_, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		log.Printf("Error listing namespaces: %v", err)
-		return stats
-	}
-
 	graceDate := now.Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).Format(labelTimeLayout)
 
 	// Phase 1: Process unlabeled namespaces
@@ -53,10 +47,11 @@ func processPhase1(
 	stats *stats.Stats,
 ) {
 	nsList, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/part-of=kubeflow-profile,!" + labelKey,
+		LabelSelector: "app.kubeflow.org/part-of=kubeflow-profile,!" + labelKey,
 	})
 	if err != nil {
-		log.Fatalf("Error listing namespaces: %v", err)
+		log.Printf("Error listing namespaces: %v", err)
+		return
 	}
 
 	for _, ns := range nsList.Items {
@@ -78,7 +73,8 @@ func processPhase2(
 		LabelSelector: labelKey,
 	})
 	if err != nil {
-		log.Printf("Error listing labeled namespaces: %v", err) 
+		log.Printf("Error listing labeled namespaces: %v", err)
+		return
 	}
 
 	for _, ns := range labeledNs.Items {
