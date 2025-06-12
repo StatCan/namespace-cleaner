@@ -109,6 +109,9 @@ func processUnlabeledNamespace(
 	} else {
 		stats.IncLabeled()
 	}
+	if err := cleaner.RemoveLabel(ctx, namespace.Name); err != nil {
+		log.Printf("Error removing label from %s: %v", namespace.Name, err)
+	}
 }
 
 func processLabeledNamespace(
@@ -154,5 +157,8 @@ func processLabeledNamespace(
 		} else {
 			stats.IncDeleted()
 		}
+	}
+	if err := cleaner.DeleteNamespace(ctx, namespace.Name, config.TestMode); err != nil {
+		log.Printf("Error deleting namespace %s: %v", namespace.Name, err)
 	}
 }
