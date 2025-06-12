@@ -22,9 +22,17 @@ func ProcessNamespaces(
 	graph *msgraphsdk.GraphServiceClient,
 	kube kubernetes.Interface,
 	cfg *config.Config,
+	now time.Time,
 ) *stats.Stats {
 	stats := &stats.Stats{}
-	graceDate := time.Now().Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).UTC().Format(labelTimeLayout)
+
+	namespaces, err := kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Printf("Error listing namespaces: %v", err)
+		return stats
+	}
+
+	graceDate := now.Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).Format(labelTimeLayout)
 
 	// Phase 1: Process unlabeled namespaces
 	processPhase1(ctx, cleaner, graph, kube, cfg, graceDate, stats)
