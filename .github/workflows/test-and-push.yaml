@@ -51,6 +51,7 @@ jobs:
 
       - name: Run Unit Tests
         run: make test-unit
+        id: unit-tests
 
       # --- Integration Tests with Kind ---
       - name: Install kubectl
