@@ -38,11 +38,13 @@ test-unit: ## Run unit tests with coverage
 	for pkg in internal/cleaner internal/clients internal/config pkg/stats cmd/namespace-cleaner; do \
 		echo "Testing $$pkg..."; \
 		cd $$pkg && \
-		go test -v -race -coverprofile=../../coverage-report/$$(basename $$pkg)-coverage.tmp -covermode=atomic . 2>&1 | sed "s/^/	 ▶ $$(basename $$pkg): /" || FAILED=1; \
+		OUTPUT=$$(go test -v -race -coverprofile=../../coverage-report/$$(basename $$pkg)-coverage.tmp -covermode=atomic . 2>&1) || FAILED=1; \
+		echo "$$OUTPUT" | sed "s/^/	 ▶ $$(basename $$pkg): /"; \
 		cd ../..; \
+		[ $$FAILED -eq 1 ] && break; \
 	done; \
 	if [ $$FAILED -eq 1 ]; then \
-		echo "Unit tests failed"; \
+		echo "Unit tests failed - exiting"; \
 		exit 1; \
 	fi; \
 	echo "mode: atomic" > coverage-report/coverage.tmp; \
