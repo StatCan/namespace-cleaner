@@ -50,6 +50,7 @@ test-unit: ## Run unit tests with coverage
 		echo "Unit tests failed"; \
 		exit 1; \
 	fi; \
+	mkdir -p coverage-report
 	echo "mode: atomic" > coverage-report/coverage.tmp; \
 	find coverage-report -name '*-coverage.tmp' -exec grep -h -v "mode: atomic" {} >> coverage-report/coverage.tmp \;; \
 	go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out; \
