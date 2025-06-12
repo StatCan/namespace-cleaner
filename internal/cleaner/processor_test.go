@@ -110,7 +110,7 @@ func TestProcessLabeledNamespace(t *testing.T) {
 	}
 }
 
-func TestProcessNamespaces(t *testing.T) {
+ffunc TestProcessNamespaces(t *testing.T) {
 	// Set fixed current time for test
 	now := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)
 	pastDate := now.Add(-24 * time.Hour).Format(labelTimeLayout)
@@ -123,6 +123,9 @@ func TestProcessNamespaces(t *testing.T) {
 			Annotations: map[string]string{
 				"owner": "user@example.com",
 			},
+			Labels: map[string]string{
+				"app.kubeflow.org/part-of": "kubeflow-profile",
+			},
 		},
 	}
 	// Should be processed for deletion
@@ -134,6 +137,7 @@ func TestProcessNamespaces(t *testing.T) {
 			},
 			Labels: map[string]string{
 				labelKey: pastDate,
+				"app.kubeflow.org/part-of": "kubeflow-profile",
 			},
 		},
 	}
@@ -146,6 +150,7 @@ func TestProcessNamespaces(t *testing.T) {
 			},
 			Labels: map[string]string{
 				labelKey: futureDate,
+				"app.kubeflow.org/part-of": "kubeflow-profile",
 			},
 		},
 	}
@@ -167,11 +172,11 @@ func TestProcessNamespaces(t *testing.T) {
 
 	stats := ProcessNamespaces(
 		context.TODO(),
-		cleaner,
-		nil, // graph client
-		client,
+		cleaner,   // NamespaceCleaner implementation
+		nil,       // graph client
+		client,    // kubernetes client
 		cfg,
-		now, // Pass current time
+		now,       // current time
 	)
 
 	// Verify stats
