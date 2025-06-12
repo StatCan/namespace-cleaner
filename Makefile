@@ -63,15 +63,6 @@ test-unit: ## Run unit tests with coverage
 	@go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out
 	@rm -f coverage-report/*-coverage.tmp
 
-	# Generate coverage report
-	@awk '/total:/ {printf "\nCoverage: %s\n", $$3}' coverage-report/coverage.out
-	@if command -v gobadge >/dev/null 2>&1; then \
-		echo "Generating coverage badge..."; \
-		gobadge -filename=coverage-report/coverage.out -green=80 -yellow=60 -target=README.md; \
-	else \
-		echo "gobadge not found - skipping badge generation"; \
-	fi
-
 	@echo "Unit tests completed"
 
 test-integration-locally: _setup-kind-cluster docker-build test-integtaion ## Run integration tests on Kind cluster
