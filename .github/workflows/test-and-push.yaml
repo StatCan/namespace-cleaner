@@ -49,9 +49,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install gobadge
-        run: go install github.com/AlexBeauchemin/gobadge@latest
-
       - name: Run Unit Tests
         run: make test-unit
 
