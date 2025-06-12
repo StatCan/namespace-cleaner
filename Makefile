@@ -34,36 +34,27 @@ test-unit: ## Run unit tests with coverage
 	@echo "	  - Verbose output: maximum"
 	@echo "=============================================="
 	@mkdir -p coverage-report
-
-	# Test internal packages
-	@cd internal/cleaner && \
-	go test -v -race -coverprofile=../../coverage-report/cleaner-coverage.tmp -covermode=atomic . \
-		| sed 's/^/	 ▶ cleaner: /'
-
-	@cd internal/clients && \
-	go test -v -race -coverprofile=../../coverage-report/clients-coverage.tmp -covermode=atomic . \
-		| sed 's/^/	 ▶ clients: /'
-
-	@cd internal/config && \
-	go test -v -race -coverprofile=../../coverage-report/config-coverage.tmp -covermode=atomic . \
-		| sed 's/^/	 ▶ config: /'
-
-	@cd pkg/stats && \
-	go test -v -race -coverprofile=../../coverage-report/stats-coverage.tmp -covermode=atomic . \
-		| sed 's/^/	 ▶ stats: /'
-
-	# Test main package
-	@cd cmd/namespace-cleaner && \
-	go test -v -race -coverprofile=../../coverage-report/main-coverage.tmp -covermode=atomic . \
-		| sed 's/^/	 ▶ main: /'
-
-	# Combine coverage reports
-	@echo "mode: atomic" > coverage-report/coverage.tmp
-	@find coverage-report -name '*-coverage.tmp' -exec grep -h -v "mode: atomic" {} >> coverage-report/coverage.tmp \;
-	@go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out
-	@rm -f coverage-report/*-coverage.tmp
-
-	@echo "Unit tests completed"
+	@set -e; \
+	EXIT_CODE=0; \
+	cd internal/cleaner && \
+	go test -v -race -coverprofile=../../coverage-report/cleaner-coverage.tmp -covermode=atomic . 2>&1 | sed 's/^/	 ▶ cleaner: /' || EXIT_CODE=1; \
+	cd ../../internal/clients && \
+	go test -v -race -coverprofile=../../coverage-report/clients-coverage.tmp -covermode=atomic . 2>&1 | sed 's/^/	 ▶ clients: /' || EXIT_CODE=1; \
+	cd ../../internal/config && \
+	go test -v -race -coverprofile=../../coverage-report/config-coverage.tmp -covermode=atomic . 2>&1 | sed 's/^/	 ▶ config: /' || EXIT_CODE=1; \
+	cd ../../pkg/stats && \
+	go test -v -race -coverprofile=../../coverage-report/stats-coverage.tmp -covermode=atomic . 2>&1 | sed 's/^/	 ▶ stats: /' || EXIT_CODE=1; \
+	cd ../../cmd/namespace-cleaner && \
+	go test -v -race -coverprofile=../../coverage-report/main-coverage.tmp -covermode=atomic . 2>&1 | sed 's/^/	 ▶ main: /' || EXIT_CODE=1; \
+	if [ "$$EXIT_CODE" -ne 0 ]; then \
+		echo "Unit tests failed"; \
+		exit 1; \
+	fi; \
+	echo "mode: atomic" > coverage-report/coverage.tmp; \
+	find coverage-report -name '*-coverage.tmp' -exec grep -h -v "mode: atomic" {} >> coverage-report/coverage.tmp \;; \
+	go tool cover -func=coverage-report/coverage.tmp | tee coverage-report/coverage.out; \
+	rm -f coverage-report/*-coverage.tmp; \
+	echo "Unit tests completed"
 
 test-integration-locally: _setup-kind-cluster docker-build test-integtaion ## Run integration tests on Kind cluster
 
