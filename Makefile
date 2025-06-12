@@ -74,7 +74,9 @@ test-unit: ## Run unit tests with coverage
 
 	@echo "Unit tests completed"
 
-test-integration: _setup-kind-cluster docker-build ## Run integration tests on Kind cluster
+test-integration-locally: _setup-kind-cluster docker-build test-integtaion ## Run integration tests on Kind cluster
+
+test-integration:
 	@export KUBECONFIG=$$HOME/.kube/kind-config-integration-test
 	@echo "Running integration tests at $(shell date)"
 
