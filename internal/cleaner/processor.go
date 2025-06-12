@@ -165,7 +165,4 @@ func processLabeledNamespace(
 			stats.IncDeleted()
 		}
 	}
-	if err := cleaner.DeleteNamespace(ctx, ns.Name, cfg.TestMode); err != nil {
-		log.Printf("Error deleting namespace %s: %v", ns.Name, err)
-	}
 }
