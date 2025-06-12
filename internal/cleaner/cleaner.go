@@ -56,7 +56,7 @@ func (c *Cleaner) RemoveLabel(ctx context.Context, nsName string) error {
 		return nil
 	}
 
-	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":null}}`)
+	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":null}}}`)
 	_, err := c.kubeClient.CoreV1().Namespaces().Patch(
 		ctx, nsName, types.MergePatchType, patch, metav1.PatchOptions{},
 	)
