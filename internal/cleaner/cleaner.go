@@ -42,7 +42,7 @@ func (c *Cleaner) LabelNamespace(ctx context.Context, nsName, graceDate string) 
 		return nil
 	}
 
-	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":"` + graceDate + `"}}`)
+	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":"` + graceDate + `"}}}`)
 	_, err := c.kubeClient.CoreV1().Namespaces().Patch(
 		ctx, nsName, types.MergePatchType, patch, metav1.PatchOptions{},
 	)
