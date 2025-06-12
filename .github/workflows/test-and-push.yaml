@@ -1,7 +1,7 @@
 ---
 name: CI Pipeline
 
-on: [push, pull_request]
+on: push
 
 env:
   GO_VERSION: 1.24
