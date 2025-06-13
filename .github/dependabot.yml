@@ -1,4 +1,3 @@
----
 version: 2
 updates:
   - package-ecosystem: "gomod"
@@ -9,7 +8,11 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    assignees:
+      - bryanpaget
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    assignees:
+      - bryanpaget
