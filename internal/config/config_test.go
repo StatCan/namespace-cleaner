@@ -79,6 +79,9 @@ func TestBoolEnvParsing(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.value, func(t *testing.T) {
+			os.Setenv("TEST_VAR", tc.value)
+			defer os.Unsetenv("TEST_VAR")
+
 			if got := getBoolEnv("TEST_VAR", false); got != tc.expected {
 				t.Errorf("Expected %v, got %v", tc.expected, got)
 			}

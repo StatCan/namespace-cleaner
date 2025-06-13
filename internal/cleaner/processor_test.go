@@ -65,8 +65,8 @@ func TestProcessUnlabeledNamespace(t *testing.T) {
 }
 
 func TestProcessLabeledNamespace(t *testing.T) {
-	now := time.Now()
-	pastDate := now.Add(-24 * time.Hour).Format(labelTimeLayout)
+	referenceTime := time.Now()
+	pastDate := referenceTime.Add(-24 * time.Hour).Format(labelTimeLayout)
 
 	// Setup test namespace with expired label
 	ns := &corev1.Namespace{
@@ -97,7 +97,7 @@ func TestProcessLabeledNamespace(t *testing.T) {
 		nil, // graph client
 		ns,
 		cfg,
-		now,
+		referenceTime,
 		stats,
 	)
 
@@ -111,6 +111,11 @@ func TestProcessLabeledNamespace(t *testing.T) {
 }
 
 func TestProcessNamespaces(t *testing.T) {
+	// Set fixed current time for test
+	referenceTime := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)
+	pastDate := referenceTime.Add(-24 * time.Hour).Format(labelTimeLayout)
+	futureDate := referenceTime.Add(24 * time.Hour).Format(labelTimeLayout)
+
 	// Setup test namespaces
 	unlabeledNs := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -118,22 +123,40 @@ func TestProcessNamespaces(t *testing.T) {
 			Annotations: map[string]string{
 				"owner": "user@example.com",
 			},
+			Labels: map[string]string{
+				"app.kubeflow.org/part-of": "kubeflow-profile",
+			},
 		},
 	}
-	labeledNs := &corev1.Namespace{
+	// Should be processed for deletion
+	expiredLabeledNs := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "labeled",
+			Name: "expired-labeled",
 			Annotations: map[string]string{
 				"owner": "user@example.com",
 			},
 			Labels: map[string]string{
-				labelKey: "2023-01-01_00-00-00Z",
+				labelKey: pastDate,
+				"app.kubeflow.org/part-of": "kubeflow-profile",
+			},
+		},
+	}
+	// Should NOT be processed (future date)
+	futureLabeledNs := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "future-labeled",
+			Annotations: map[string]string{
+				"owner": "user@example.com",
+			},
+			Labels: map[string]string{
+				labelKey: futureDate,
+				"app.kubeflow.org/part-of": "kubeflow-profile",
 			},
 		},
 	}
 
 	// Create fake client with namespaces
-	client := fake.NewSimpleClientset(unlabeledNs, labeledNs)
+	client := fake.NewSimpleClientset(unlabeledNs, expiredLabeledNs, futureLabeledNs)
 
 	// Setup mock cleaner and user check
 	cleaner := &mockCleaner{}
@@ -149,22 +172,44 @@ func TestProcessNamespaces(t *testing.T) {
 
 	stats := ProcessNamespaces(
 		context.TODO(),
-		cleaner,
-		nil, // graph client
-		client,
+		cleaner,   // NamespaceCleaner implementation
+		nil,       // graph client
+		client,    // kubernetes client
 		cfg,
+		referenceTime,       // current time
 	)
 
 	// Verify stats
-	if stats.TotalNamespaces != 2 {
-		t.Errorf("Expected 2 namespaces, got %d", stats.TotalNamespaces)
+	if stats.TotalNamespaces != 3 {
+		t.Errorf("Expected 3 namespaces, got %d", stats.TotalNamespaces)
 	}
 	if stats.Labeled != 1 {
-		t.Error("Expected 1 namespace to be labeled")
+		t.Errorf("Expected 1 namespace to be labeled, got %d", stats.Labeled)
 	}
 	if stats.Deleted != 1 {
-		t.Error("Expected 1 namespace to be deleted")
+		t.Errorf("Expected 1 namespace to be deleted, got %d", stats.Deleted)
 	}
+	
+	// Verify which namespaces were processed
+	if !contains(cleaner.labeled, "unlabeled") {
+		t.Error("Expected 'unlabeled' namespace to be labeled")
+	}
+	if !contains(cleaner.deleted, "expired-labeled") {
+		t.Error("Expected 'expired-labeled' namespace to be deleted")
+	}
+	if contains(cleaner.deleted, "future-labeled") {
+		t.Error("'future-labeled' namespace should not be deleted")
+	}
+}
+
+// Helper function to check if a string is in a slice
+func contains(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }
 
 // Helper struct for testing

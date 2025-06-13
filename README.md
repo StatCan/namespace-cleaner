@@ -1,5 +1,4 @@
 # Kubernetes Namespace Cleaner
-![Coverage](https://img.shields.io/badge/Coverage-46.8%25-red)
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/7f10d356-9312-4483-aea0-33aeef6880d9" alt="Namespace Cleaner Logo" width="400"/>

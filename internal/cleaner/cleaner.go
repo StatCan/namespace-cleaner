@@ -42,7 +42,7 @@ func (c *Cleaner) LabelNamespace(ctx context.Context, nsName, graceDate string) 
 		return nil
 	}
 
-	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":"` + graceDate + `"}}`)
+	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":"` + graceDate + `"}}}`)
 	_, err := c.kubeClient.CoreV1().Namespaces().Patch(
 		ctx, nsName, types.MergePatchType, patch, metav1.PatchOptions{},
 	)
@@ -56,10 +56,13 @@ func (c *Cleaner) RemoveLabel(ctx context.Context, nsName string) error {
 		return nil
 	}
 
-	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":null}}`)
+	patch := []byte(`{"metadata":{"labels":{"` + labelKey + `":null}}}`)
 	_, err := c.kubeClient.CoreV1().Namespaces().Patch(
 		ctx, nsName, types.MergePatchType, patch, metav1.PatchOptions{},
 	)
+	if err != nil {
+		log.Printf("Error removing label from %s: %v", nsName, err)
+	}
 	return err
 }
 

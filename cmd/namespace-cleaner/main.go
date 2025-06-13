@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/StatCan/namespace-cleaner/internal/cleaner"
 	"github.com/StatCan/namespace-cleaner/internal/clients"
@@ -21,7 +22,14 @@ func main() {
 	nsCleaner := cleaner.NewCleaner(cfg.DryRun, kubeClient)
 
 	// Execute namespace cleaning
-	stats := cleaner.ProcessNamespaces(ctx, nsCleaner, graphClient, kubeClient, cfg)
+	stats := cleaner.ProcessNamespaces(
+		ctx,
+		nsCleaner,
+		graphClient,
+		kubeClient,
+		cfg,
+		time.Now(),
+	)
 
 	// Print summary if in dry-run mode
 	if cfg.DryRun {
