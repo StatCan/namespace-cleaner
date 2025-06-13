@@ -22,17 +22,17 @@ func ProcessNamespaces(
 	graph *msgraphsdk.GraphServiceClient,
 	kube kubernetes.Interface,
 	cfg *config.Config,
-	now time.Time,
+	referenceTime time.Time,
 ) *stats.Stats {
 	stats := &stats.Stats{}
 
-	graceDate := now.Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).Format(labelTimeLayout)
+	graceDate := referenceTime.Add(time.Duration(cfg.GracePeriod) * 24 * time.Hour).Format(labelTimeLayout)
 
 	// Phase 1: Process unlabeled namespaces
 	processPhase1(ctx, cleaner, graph, kube, cfg, graceDate, stats)
 
 	// Phase 2: Process labeled namespaces
-	processPhase2(ctx, cleaner, graph, kube, cfg, now, stats)
+	processPhase2(ctx, cleaner, graph, kube, cfg, referenceTime, stats)
 
 	return stats
 }
@@ -66,7 +66,7 @@ func processPhase2(
 	graph *msgraphsdk.GraphServiceClient,
 	kube kubernetes.Interface,
 	cfg *config.Config,
-	now time.Time,
+	referenceTime time.Time,
 	stats *stats.Stats,
 ) {
 	labeledNs, err := kube.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
@@ -79,7 +79,7 @@ func processPhase2(
 
 	for _, ns := range labeledNs.Items {
 		stats.IncTotal()
-		processLabeledNamespace(ctx, cleaner, graph, &ns, cfg, now, stats)
+		processLabeledNamespace(ctx, cleaner, graph, &ns, cfg, referenceTime, stats)
 	}
 }
 

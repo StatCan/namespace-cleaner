@@ -65,8 +65,8 @@ func TestProcessUnlabeledNamespace(t *testing.T) {
 }
 
 func TestProcessLabeledNamespace(t *testing.T) {
-	now := time.Now()
-	pastDate := now.Add(-24 * time.Hour).Format(labelTimeLayout)
+	referenceTime := time.Now()
+	pastDate := referenceTime.Add(-24 * time.Hour).Format(labelTimeLayout)
 
 	// Setup test namespace with expired label
 	ns := &corev1.Namespace{
@@ -97,7 +97,7 @@ func TestProcessLabeledNamespace(t *testing.T) {
 		nil, // graph client
 		ns,
 		cfg,
-		now,
+		referenceTime,
 		stats,
 	)
 
@@ -112,9 +112,9 @@ func TestProcessLabeledNamespace(t *testing.T) {
 
 func TestProcessNamespaces(t *testing.T) {
 	// Set fixed current time for test
-	now := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)
-	pastDate := now.Add(-24 * time.Hour).Format(labelTimeLayout)
-	futureDate := now.Add(24 * time.Hour).Format(labelTimeLayout)
+	referenceTime := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)
+	pastDate := referenceTime.Add(-24 * time.Hour).Format(labelTimeLayout)
+	futureDate := referenceTime.Add(24 * time.Hour).Format(labelTimeLayout)
 
 	// Setup test namespaces
 	unlabeledNs := &corev1.Namespace{
@@ -176,7 +176,7 @@ func TestProcessNamespaces(t *testing.T) {
 		nil,       // graph client
 		client,    // kubernetes client
 		cfg,
-		now,       // current time
+		referenceTime,       // current time
 	)
 
 	// Verify stats
