@@ -98,4 +98,3 @@ jobs:
         run: |
           docker tag ${{ env.IMAGE_NAME }} ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/namespace-cleaner:${{ github.sha }}
-          
