@@ -4,7 +4,7 @@ WORKDIR /app
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o namespace-cleaner ./cmd/namespace-cleaner
 
-FROM alpine:3.21
+FROM alpine:3.22
 
 COPY --from=builder /app/namespace-cleaner /namespace-cleaner
 ENTRYPOINT ["/bin/sh"]
