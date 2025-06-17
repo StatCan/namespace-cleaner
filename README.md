@@ -51,13 +51,16 @@ flowchart TD
 git clone https://github.com/StatCan/namespace-cleaner.git
 cd namespace-cleaner
 
-# Build and Verify
-make build test
+# Build the Docker image (required for all other operations)
+make image
 
-# Dry Run Validation
+# Run unit tests
+make test-unit
+
+# Perform a dry-run on a real cluster
 make dry-run
 
-# Production Deployment
+# Deploy to production
 make run
 ```
 
