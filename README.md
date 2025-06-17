@@ -154,6 +154,7 @@ Our GitHub Actions pipeline includes:
 
 ```yaml
 # configmap.yaml
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
