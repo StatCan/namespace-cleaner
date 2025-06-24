@@ -53,7 +53,7 @@ test-unit: ## Run unit tests with coverage
 	rm -f coverage-report/*-coverage.tmp; \
 	echo "Unit tests completed"
 
-test-integration-locally: _setup-kind-cluster docker-build test-integtaion ## Run integration tests on Kind cluster
+test-integration-locally: _setup-kind-cluster docker-build test-integration ## Run integration tests on Kind cluster
 
 test-integration:
 	@export KUBECONFIG=$$HOME/.kube/kind-config-integration-test
