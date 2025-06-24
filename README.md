@@ -49,16 +49,16 @@ The Canada wordmark and related graphics associated with this distribution are p
 [(English)](#kubernetes-namespace-cleaner)
 
 * **Quel est ce projet?**
-  Un outil automatisé qui nettoie les namespaces Kubernetes associés à des utilisateurs supprimés d’Azure Entra ID (anciennement Azure AD).
+  Un outil automatisé qui nettoie les espaces de noms Kubernetes associés à des utilisateurs supprimés d'Azure Entra ID (anciennement Azure AD).
 
 * **Comment ça marche?**
-  Le CronJob analyse les namespaces récents, vérifie la validité des utilisateurs, puis supprime ceux dont les utilisateurs sont absents après un délai de grâce. Trois modes sont disponibles : test, simulation (dry-run) et production.
+  Le CronJob analyse les espaces de noms récents, vérifie la validité des utilisateurs, puis supprime ceux dont les utilisateurs sont absents après un délai de grâce. Trois modes sont disponibles : test, simulation (dry-run) et production.
 
 * **Qui utilisera ce projet?**
-  Les administrateurs de clusters Kubernetes dans des environnements partagés (comme Kubeflow), intégrés avec Entra ID.
+  Les administrateurs de clusters Kubernetes dans des environnements partagés (tel que Kubeflow), intégrés avec Entra ID.
 
 * **Quel est le but de ce projet?**
-  Réduire les risques de sécurité et garder un cluster propre grâce à la gestion automatique du cycle de vie des namespaces.
+  Réduire les risques de sécurité et garder un cluster propre grâce à la gestion automatique du cycle de vie des espaces de noms.
 
 ---
 
