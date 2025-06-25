@@ -6,41 +6,42 @@
 
 A Kubernetes CronJob that automatically detects and removes namespaces associated with deprovisioned Azure Entra ID (formerly Azure AD) users.
 
-* **What is this project?**
+### What is this project?
 
-  A lifecycle automation tool for Kubernetes namespaces. It identifies user-created namespaces, verifies user status through Azure Entra ID, and labels or deletes expired ones.
+A lifecycle automation tool for Kubernetes namespaces. It identifies user-created namespaces, verifies user status through Azure Entra ID, and labels or deletes expired ones.
 
-* **How does it work?**
+### How does it work?
 
-  It runs in two phases:
+It runs in two phases:
 
-  1. **Evaluation**: Identifies new namespaces and checks if the associated user is valid.
-  2. **Cleanup**: Deletes namespaces labeled for removal after a grace period, if the user is still missing.
-     It supports mock, dry-run, and production modes.
+1. **Evaluation**: Identifies new namespaces and checks if the associated user is valid.
+2. **Cleanup**: Deletes namespaces labeled for removal after a grace period, if the user is still missing.
 
-* **Who will use this project?**
+It supports mock, dry-run, and production modes.
 
-  Cluster administrators who need to enforce namespace hygiene and lifecycle policies in environments integrated with Entra ID, especially in multi-tenant Kubernetes platforms like Kubeflow.
+### Who will use this project?
 
-* **What is the goal of this project?**
+Cluster administrators who need to enforce namespace hygiene and lifecycle policies in environments integrated with Entra ID, especially in multi-tenant Kubernetes platforms like Kubeflow.
 
-  To safely and automatically manage orphaned namespaces, reduce security risk, and maintain cluster cleanliness without manual intervention.
+### What is the goal of this project?
+
+To safely and automatically manage orphaned namespaces, reduce security risk, and maintain cluster cleanliness without manual intervention.
 
 ---
 
-### Development Status
+#### Development Status
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/StatCan/namespace-cleaner)
 
 ---
 
-### How to Contribute
+#### How to Contribute
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-### License
+#### License
 
 Unless otherwise noted, the source code of this project is covered under Crown Copyright, Government of Canada, and is distributed under the [GNU Affero General Public License](LICENSE.md).
 
@@ -52,35 +53,36 @@ The Canada wordmark and related graphics associated with this distribution are p
 
 [(English)](#kubernetes-namespace-cleaner)
 
-* **Quel est ce projet?**
+### Quel est ce projet?
 
-  Un outil automatisé qui nettoie les espaces de noms Kubernetes associés à des utilisateurs supprimés d'Azure Entra ID (anciennement Azure AD).
+Un outil automatisé qui nettoie les espaces de noms Kubernetes associés à des utilisateurs supprimés d'Azure Entra ID (anciennement Azure AD).
 
-* **Comment ça marche?**
+### Comment ça marche?
 
-  Le CronJob fonctionne en deux phases :
+Le CronJob fonctionne en deux phases :
 
-  1. **Évaluation** : identifie les nouveaux espaces de noms et vérifie si l'utilisateur associé est valide.
-  2. **Nettoyage** : supprime les espaces de noms étiquetés pour suppression après un délai de grâce, si l'utilisateur est toujours inexistant.
-     Trois modes sont disponibles : test, simulation (dry-run) et production.
+1. **Évaluation** : identifie les nouveaux espaces de noms et vérifie si l'utilisateur associé est valide.
+2. **Nettoyage** : supprime les espaces de noms étiquetés pour suppression après un délai de grâce, si l'utilisateur est toujours inexistant.
 
-* **Qui utilisera ce projet?**
+Trois modes sont disponibles : test, simulation (dry-run) et production.
 
-  Les administrateurs de clusters Kubernetes dans des environnements partagés (tel que Kubeflow), intégrés avec Entra ID.
+### Qui utilisera ce projet?
 
-* **Quel est le but de ce projet?**
+Les administrateurs de clusters Kubernetes dans des environnements partagés (tel que Kubeflow), intégrés avec Entra ID.
 
-  Réduire les risques de sécurité et garder un cluster propre grâce à la gestion automatique du cycle de vie des espaces de noms.
+### Quel est le but de ce projet?
+
+Réduire les risques de sécurité et garder un cluster propre grâce à la gestion automatique du cycle de vie des espaces de noms.
 
 ---
 
-### Comment contribuer
+#### Comment contribuer
 
 Voir [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-### Licence
+#### Licence
 
 Sauf indication contraire, le code source de ce projet est protégé par le droit d'auteur de la Couronne du gouvernement du Canada et distribué sous la [licence publique générale affero GNU](LICENSE.md).
 
