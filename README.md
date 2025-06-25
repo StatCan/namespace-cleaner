@@ -7,9 +7,11 @@
 A Kubernetes CronJob that automatically detects and removes namespaces associated with deprovisioned Azure Entra ID (formerly Azure AD) users.
 
 * **What is this project?**
+
   A lifecycle automation tool for Kubernetes namespaces. It identifies user-created namespaces, verifies user status through Azure Entra ID, and labels or deletes expired ones.
 
 * **How does it work?**
+
   It runs in two phases:
 
   1. **Evaluation**: Identifies new namespaces and checks if the associated user is valid.
@@ -17,9 +19,11 @@ A Kubernetes CronJob that automatically detects and removes namespaces associate
      It supports mock, dry-run, and production modes.
 
 * **Who will use this project?**
+
   Cluster administrators who need to enforce namespace hygiene and lifecycle policies in environments integrated with Entra ID, especially in multi-tenant Kubernetes platforms like Kubeflow.
 
 * **What is the goal of this project?**
+
   To safely and automatically manage orphaned namespaces, reduce security risk, and maintain cluster cleanliness without manual intervention.
 
 ---
@@ -49,9 +53,11 @@ The Canada wordmark and related graphics associated with this distribution are p
 [(English)](#kubernetes-namespace-cleaner)
 
 * **Quel est ce projet?**
+
   Un outil automatisé qui nettoie les espaces de noms Kubernetes associés à des utilisateurs supprimés d'Azure Entra ID (anciennement Azure AD).
 
 * **Comment ça marche?**
+
   Le CronJob fonctionne en deux phases :
 
   1. **Évaluation** : identifie les nouveaux espaces de noms et vérifie si l'utilisateur associé est valide.
@@ -59,9 +65,11 @@ The Canada wordmark and related graphics associated with this distribution are p
      Trois modes sont disponibles : test, simulation (dry-run) et production.
 
 * **Qui utilisera ce projet?**
+
   Les administrateurs de clusters Kubernetes dans des environnements partagés (tel que Kubeflow), intégrés avec Entra ID.
 
 * **Quel est le but de ce projet?**
+
   Réduire les risques de sécurité et garder un cluster propre grâce à la gestion automatique du cycle de vie des espaces de noms.
 
 ---
