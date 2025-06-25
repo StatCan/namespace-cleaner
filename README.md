@@ -38,7 +38,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### License
 
-Unless otherwise noted, the source code of this project is covered under Crown Copyright, Government of Canada, and is distributed under the [MIT License](LICENSE).
+Unless otherwise noted, the source code of this project is covered under Crown Copyright, Government of Canada, and is distributed under the [GNU Affero General Public License](LICENSE.md).
 
 The Canada wordmark and related graphics associated with this distribution are protected under trademark law and copyright law. No permission is granted to use them outside the parameters of the Government of Canada's corporate identity program. For more information, see [Federal identity requirements](https://www.canada.ca/en/treasury-board-secretariat/topics/government-communications/federal-identity-requirements.html).
 
@@ -52,7 +52,11 @@ The Canada wordmark and related graphics associated with this distribution are p
   Un outil automatisé qui nettoie les espaces de noms Kubernetes associés à des utilisateurs supprimés d'Azure Entra ID (anciennement Azure AD).
 
 * **Comment ça marche?**
-  Le CronJob analyse les espaces de noms récents, vérifie la validité des utilisateurs, puis supprime ceux dont les utilisateurs sont absents après un délai de grâce. Trois modes sont disponibles : test, simulation (dry-run) et production.
+  Le CronJob fonctionne en deux phases :
+
+  1. **Évaluation** : identifie les nouveaux espaces de noms et vérifie si l'utilisateur associé est valide.
+  2. **Nettoyage** : supprime les espaces de noms étiquetés pour suppression après un délai de grâce, si l'utilisateur est toujours inexistant.
+     Trois modes sont disponibles : test, simulation (dry-run) et production.
 
 * **Qui utilisera ce projet?**
   Les administrateurs de clusters Kubernetes dans des environnements partagés (tel que Kubeflow), intégrés avec Entra ID.
@@ -70,7 +74,7 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Licence
 
-Sauf indication contraire, le code source de ce projet est protégé par le droit d'auteur de la Couronne du gouvernement du Canada et distribué sous la [licence MIT](LICENSE).
+Sauf indication contraire, le code source de ce projet est protégé par le droit d'auteur de la Couronne du gouvernement du Canada et distribué sous la [licence publique générale affero GNU](LICENSE.md).
 
 Le mot-symbole « Canada » et les éléments graphiques connexes liés à cette distribution sont protégés en vertu des lois portant sur les marques de commerce et le droit d'auteur. Aucune autorisation n'est accordée pour leur utilisation à l'extérieur des paramètres du programme de coordination de l'image de marque du gouvernement du Canada. Pour obtenir davantage de renseignements à ce sujet, veuillez consulter les [Exigences pour l'image de marque](https://www.canada.ca/fr/secretariat-conseil-tresor/sujets/communications-gouvernementales/exigences-image-marque.html).
 
@@ -117,36 +121,50 @@ flowchart TD
 
 ---
 
-## Quick Start
+## Fonctionnalités principales
+
+* ✅ **Gestion automatisée du cycle de vie** – Système de conservation basé sur des étiquettes
+* 🔒 **Sécurité avant tout** – Vérification des utilisateurs avec Entra ID et liste de domaines autorisés
+* 🧪 **Tests facilités** – Prise en charge des modes test et simulation
+* ☁️ **Sécurité des opérations** – Empêche les suppressions accidentelles grâce au mode aperçu
+
+---
+
+## Quick Start / Démarrage rapide
 
 ```bash
-# Clone & Setup
+# Clone & Setup / Clonage et configuration
 git clone https://github.com/StatCan/namespace-cleaner.git
 cd namespace-cleaner
 
-# Build the Docker image
+# Build the Docker image / Construire l'image Docker
 make image
 
-# Run unit tests
+# Run unit tests / Exécuter les tests unitaires
 make test-unit
 
-# Perform a dry-run (no real deletion)
+# Perform a dry-run (no real deletion) / Lancer une simulation sans suppression réelle
 make dry-run
 
-# Deploy in production
+# Deploy in production / Déployer en production
 make run
 ```
 
 ---
 
-## CI/CD Integration
+## CI/CD Integration / Intégration CI/CD
 
 Our GitHub Actions pipeline includes:
+Notre pipeline GitHub Actions comprend :
 
 * ✅ Unit testing and dry-run validation
+  ✅ Tests unitaires et validation en mode simulation
 * 🔒 Trivy-based container image vulnerability scanning
+  🔒 Analyse de vulnérabilités des images avec Trivy
 * 📦 Docker builds on push
+  📦 Construction des images Docker lors des *push*
 * 📈 Live test coverage badge generation
+  📈 Génération d'un badge de couverture de test en temps réel
 
 ---
 
@@ -167,15 +185,15 @@ data:
 
 ---
 
-## Monitoring & Troubleshooting
+## Monitoring & Troubleshooting / Surveillance et dépannage
 
 ```bash
-# View job logs
+# View job logs / Voir les journaux du job
 kubectl logs -l job-name=namespace-cleaner
 
-# View cronjob status
+# View cronjob status / Voir le statut du CronJob
 kubectl get cronjob namespace-cleaner -o wide
 
-# Reset everything
+# Reset everything / Réinitialiser tous les composants
 make stop && make clean && make run
 ```
