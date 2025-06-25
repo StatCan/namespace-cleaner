@@ -82,7 +82,7 @@ Le mot-symbole « Canada » et les éléments graphiques connexes liés à cette
 
 ## System Overview
 
-### Phase 1: New Namespace Evaluation
+### Phase 1: New Namespace Evaluation (English)
 
 ```mermaid
 flowchart TD
@@ -98,7 +98,23 @@ flowchart TD
     G2 -->|Exists| J[No Action]
 ```
 
-### Phase 2: Expired Namespace Cleanup
+### Phase 1: Évaluation des nouveaux namespaces (Français)
+
+```mermaid
+flowchart TD
+    A[Début] --> B{Mode}
+    B -->|Test| C[Utiliser des données simulées]
+    B -->|Simulation| D[Afficher les actions]
+    B -->|Production| E[Authentification Azure réelle]
+    C & D & E --> F[Analyser les nouveaux espaces de noms]
+    F --> G1{Domaine valide ?}
+    G1 -->|Oui| G2{Utilisateur existant ?}
+    G1 -->|Non| H[Consigner et ignorer]
+    G2 -->|Inexistant| I[Étiqueter pour suppression]
+    G2 -->|Existant| J[Aucune action]
+```
+
+### Phase 2: Expired Namespace Cleanup (English)
 
 ```mermaid
 flowchart TD
@@ -108,6 +124,18 @@ flowchart TD
     M -->|No| O[Keep Namespace]
     N -->|Yes| P[Delete Namespace]
     N -->|No| Q[Remove Label]
+```
+
+### Phase 2 : Nettoyage des espaces de noms expirés (Français)
+
+```mermaid
+flowchart TD
+    K[Début] --> L[Analyser les espaces de noms étiquetés]
+    L --> M{Délai de grâce expiré ?}
+    M -->|Oui| N{Utilisateur toujours inexistant ?}
+    M -->|Non| O[Garder l'espace de noms]
+    N -->|Oui| P[Supprimer l'espace de noms]
+    N -->|Non| Q[Retirer l'étiquette]
 ```
 
 ---
