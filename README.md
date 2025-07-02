@@ -4,7 +4,7 @@
 
 ## Kubernetes Namespace Cleaner
 
-A Kubernetes CronJob that automatically detects and removes namespaces associated with deprovisioned Azure Entra ID (formerly Azure AD) users.
+A Kubernetes CronJob that automatically detects and deletes namespaces associated with deprovisioned Azure Entra ID (formerly Azure AD) users.
 
 ### What is this project?
 
@@ -55,7 +55,7 @@ The Canada wordmark and related graphics associated with this distribution are p
 
 ### Quel est ce projet?
 
-Un outil automatisé qui nettoie les espaces de noms Kubernetes associés à des utilisateurs supprimés d'Azure Entra ID (anciennement Azure AD).
+Un CronJob Kubernetes qui détecte et supprime automatiquement les espaces de noms associés aux utilisateurs Azure Entra ID (anciennement Azure AD) déprovisionnés.
 
 ### Comment ça marche?
 
