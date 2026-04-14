@@ -29,7 +29,7 @@ To safely and automatically manage orphaned namespaces, reduce security risk, an
 
 ## System Overview
 
-### Phase 1: New Namespace Evaluation (English)
+### Phase 1: New Namespace Evaluation
 
 ```mermaid
 flowchart TD
@@ -44,7 +44,7 @@ flowchart TD
     G2 -->|Missing| I[Label for Deletion]
     G2 -->|Exists| J[No Action]
 ```
-### Phase 2: Expired Namespace Cleanup (English)
+### Phase 2: Expired Namespace Cleanup
 
 ```mermaid
 flowchart TD
@@ -177,7 +177,7 @@ Le mot-symbole « Canada » et les éléments graphiques connexes liés à cette
 
 ---
 
-### Phase 1: Évaluation des nouveaux namespaces (Français)
+### Phase 1: Évaluation des nouveaux namespaces
 
 ```mermaid
 flowchart TD
@@ -193,7 +193,7 @@ flowchart TD
     G2 -->|Existant| J[Aucune action]
 ```
 
-### Phase 2 : Nettoyage des espaces de noms expirés (Français)
+### Phase 2 : Nettoyage des espaces de noms expirés
 
 ```mermaid
 flowchart TD
