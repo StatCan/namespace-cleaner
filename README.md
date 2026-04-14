@@ -27,21 +27,108 @@ Cluster administrators who need to enforce namespace hygiene and lifecycle polic
 
 To safely and automatically manage orphaned namespaces, reduce security risk, and maintain cluster cleanliness without manual intervention.
 
----
+## System Overview
 
-#### Development Status
+### Phase 1: New Namespace Evaluation (English)
+
+```mermaid
+flowchart TD
+    A[Start] --> B{Mode}
+    B -->|Test| C[Use Mock Data]
+    B -->|Dry Run| D[Preview Actions]
+    B -->|Prod| E[Real Azure Auth]
+    C & D & E --> F[Check New Namespaces]
+    F --> G1{Valid Domain?}
+    G1 -->|Yes| G2{User Exists?}
+    G1 -->|No| H[Log & Ignore]
+    G2 -->|Missing| I[Label for Deletion]
+    G2 -->|Exists| J[No Action]
+```
+### Phase 2: Expired Namespace Cleanup (English)
+
+```mermaid
+flowchart TD
+    K[Start] --> L[Check Labeled Namespaces]
+    L --> M{Grace Period Expired?}
+    M -->|Yes| N{User Still Missing?}
+    M -->|No| O[Keep Namespace]
+    N -->|Yes| P[Delete Namespace]
+    N -->|No| Q[Remove Label]
+```
+## Key Features
+
+* ✅ **Automated Lifecycle Management** – Label-based namespace retention system
+* 🔒 **Security First** – Azure Entra ID user verification with domain allowlist
+* 🧪 **Testing Friendly** – Mock and dry-run support
+* ☁️ **Safe Operations** – Prevent accidental deletion through preview-only mode
+
+## Quick Start
+
+```bash
+# Clone & Setup
+git clone https://github.com/StatCan/namespace-cleaner.git
+cd namespace-cleaner
+
+# Build the Docker image
+make image
+
+# Run unit tests
+make test-unit
+
+# Perform a dry-run (no real deletion)
+make dry-run
+
+# Deploy in production
+make run
+```
+
+## CI/CD Integration
+
+Our GitHub Actions pipeline includes:
+
+* ✅ Unit testing and dry-run validation
+* 🔒 Trivy-based container image vulnerability scanning
+* 📦 Docker builds on push
+* 📈 Live test coverage badge generation
+
+
+## Configuration
+
+```yaml
+# configmap.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespace-cleaner-config
+  namespace: das
+data:
+  ALLOWED_DOMAINS: "statcan.gc.ca,cloud.statcan.ca"
+  GRACE_PERIOD: "90d"  # e.g. "24h", "30d"
+```
+
+## Monitoring & Troubleshooting
+
+```bash
+# View job logs
+kubectl logs -l job-name=namespace-cleaner
+
+# View cronjob status
+kubectl get cronjob namespace-cleaner -o wide
+
+# Reset everything
+make stop && make clean && make run
+```
+
+### Development Status
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/StatCan/namespace-cleaner)
 
----
-
-#### How to Contribute
+### How to Contribute
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
 
----
-
-#### License
+### License
 
 Unless otherwise noted, the source code of this project is covered under Crown Copyright, Government of Canada, and is distributed under the [GNU Affero General Public License](LICENSE).
 
@@ -90,24 +177,6 @@ Le mot-symbole « Canada » et les éléments graphiques connexes liés à cette
 
 ---
 
-## System Overview
-
-### Phase 1: New Namespace Evaluation (English)
-
-```mermaid
-flowchart TD
-    A[Start] --> B{Mode}
-    B -->|Test| C[Use Mock Data]
-    B -->|Dry Run| D[Preview Actions]
-    B -->|Prod| E[Real Azure Auth]
-    C & D & E --> F[Check New Namespaces]
-    F --> G1{Valid Domain?}
-    G1 -->|Yes| G2{User Exists?}
-    G1 -->|No| H[Log & Ignore]
-    G2 -->|Missing| I[Label for Deletion]
-    G2 -->|Exists| J[No Action]
-```
-
 ### Phase 1: Évaluation des nouveaux namespaces (Français)
 
 ```mermaid
@@ -124,18 +193,6 @@ flowchart TD
     G2 -->|Existant| J[Aucune action]
 ```
 
-### Phase 2: Expired Namespace Cleanup (English)
-
-```mermaid
-flowchart TD
-    K[Start] --> L[Check Labeled Namespaces]
-    L --> M{Grace Period Expired?}
-    M -->|Yes| N{User Still Missing?}
-    M -->|No| O[Keep Namespace]
-    N -->|Yes| P[Delete Namespace]
-    N -->|No| Q[Remove Label]
-```
-
 ### Phase 2 : Nettoyage des espaces de noms expirés (Français)
 
 ```mermaid
@@ -148,17 +205,6 @@ flowchart TD
     N -->|Non| Q[Retirer l'étiquette]
 ```
 
----
-
-## Key Features
-
-* ✅ **Automated Lifecycle Management** – Label-based namespace retention system
-* 🔒 **Security First** – Azure Entra ID user verification with domain allowlist
-* 🧪 **Testing Friendly** – Mock and dry-run support
-* ☁️ **Safe Operations** – Prevent accidental deletion through preview-only mode
-
----
-
 ## Fonctionnalités principales
 
 * ✅ **Gestion automatisée du cycle de vie** – Système de conservation basé sur des étiquettes
@@ -166,72 +212,3 @@ flowchart TD
 * 🧪 **Tests facilités** – Prise en charge des modes test et simulation
 * ☁️ **Sécurité des opérations** – Empêche les suppressions accidentelles grâce au mode aperçu
 
----
-
-## Quick Start / Démarrage rapide
-
-```bash
-# Clone & Setup / Clonage et configuration
-git clone https://github.com/StatCan/namespace-cleaner.git
-cd namespace-cleaner
-
-# Build the Docker image / Construire l'image Docker
-make image
-
-# Run unit tests / Exécuter les tests unitaires
-make test-unit
-
-# Perform a dry-run (no real deletion) / Lancer une simulation sans suppression réelle
-make dry-run
-
-# Deploy in production / Déployer en production
-make run
-```
-
----
-
-## CI/CD Integration / Intégration CI/CD
-
-Our GitHub Actions pipeline includes:
-Notre pipeline GitHub Actions comprend :
-
-* ✅ Unit testing and dry-run validation
-  ✅ Tests unitaires et validation en mode simulation
-* 🔒 Trivy-based container image vulnerability scanning
-  🔒 Analyse de vulnérabilités des images avec Trivy
-* 📦 Docker builds on push
-  📦 Construction des images Docker lors des *push*
-* 📈 Live test coverage badge generation
-  📈 Génération d'un badge de couverture de test en temps réel
-
----
-
-## Configuration
-
-```yaml
-# configmap.yaml
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: namespace-cleaner-config
-  namespace: das
-data:
-  ALLOWED_DOMAINS: "statcan.gc.ca,cloud.statcan.ca"
-  GRACE_PERIOD: "90d"  # e.g. "24h", "30d"
-```
-
----
-
-## Monitoring & Troubleshooting / Surveillance et dépannage
-
-```bash
-# View job logs / Voir les journaux du job
-kubectl logs -l job-name=namespace-cleaner
-
-# View cronjob status / Voir le statut du CronJob
-kubectl get cronjob namespace-cleaner -o wide
-
-# Reset everything / Réinitialiser tous les composants
-make stop && make clean && make run
-```
