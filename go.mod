@@ -14,11 +14,10 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.0.0 // indirect
-	github.com/cjlapao/common-go v0.0.39 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect
@@ -27,16 +26,16 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
-	github.com/google/uuid v1.3.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/microsoft/kiota-abstractions-go v1.2.1 // indirect
+	github.com/microsoft/kiota-abstractions-go v1.9.2 // indirect
 	github.com/microsoft/kiota-authentication-azure-go v1.0.0 // indirect
-	github.com/microsoft/kiota-http-go v1.1.0 // indirect
+	github.com/microsoft/kiota-http-go v1.5.5 // indirect
 	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-json-go v1.0.4 // indirect
 	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
@@ -48,11 +47,12 @@ require (
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
-	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.opentelemetry.io/otel v1.17.0 // indirect
-	go.opentelemetry.io/otel/metric v1.17.0 // indirect
-	go.opentelemetry.io/otel/trace v1.17.0 // indirect
+	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.3 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/otel v1.35.0 // indirect
+	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
