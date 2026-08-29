@@ -15,7 +15,7 @@ env:
   GO_VERSION: 1.24
   KIND_VERSION: v0.27.0
   IMAGE_NAME: namespace-cleaner:test
-  REGISTRY: k8scc01covidacr.azurecr.io
+  REGISTRY: stcthezoneacr.azurecr.io
 
 jobs:
   deploy-namespace-cleaner:  # Consolidated job for all deployment-related tasks
@@ -79,7 +79,7 @@ jobs:
       # --- Security Scan ---
       - name: Run Trivy Security Scan
         env:
-          TRIVY_VERSION: "0.69.3"
+          TRIVY_VERSION: "0.72.0"
           TRIVY_DIGEST: "sha256:7228e304ae0f610a1fad937baa463598cadac0c2ac4027cc68f3a8b997115689"
           TRIVY_DB_REPOSITORIES: '"ghcr.io/aquasecurity/trivy-db:2","public.ecr.aws/aquasecurity/trivy-db"'
           TRIVY_JAVA_DB_REPOSITORIES: '"ghcr.io/aquasecurity/trivy-java-db:1","public.ecr.aws/aquasecurity/trivy-java-db"'
